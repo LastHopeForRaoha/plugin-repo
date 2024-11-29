@@ -29,7 +29,7 @@ function mkwa_fitness_load_textdomain() {
 add_action('plugins_loaded', 'mkwa_fitness_load_textdomain');
 
 /**
- * Activation hook.
+ * Activation hook: Initialize options.
  */
 function mkwa_fitness_activate() {
     add_option('mkwa_fitness_rewards', []);
@@ -37,6 +37,16 @@ function mkwa_fitness_activate() {
     add_option('mkwa_fitness_leaderboard', []);
 }
 register_activation_hook(__FILE__, 'mkwa_fitness_activate');
+
+/**
+ * Deactivation hook: Clean up options.
+ */
+function mkwa_fitness_deactivate() {
+    delete_option('mkwa_fitness_rewards');
+    delete_option('mkwa_fitness_challenges');
+    delete_option('mkwa_fitness_leaderboard');
+}
+register_deactivation_hook(__FILE__, 'mkwa_fitness_deactivate');
 
 /**
  * Admin Menu for Backend Management.
@@ -85,6 +95,17 @@ function mkwa_fitness_admin_page() {
 }
 
 /**
+ * Register shortcodes.
+ */
+function mkwa_register_shortcodes() {
+    add_shortcode('mkwa_dashboard', 'mkwa_member_dashboard_shortcode');
+    add_shortcode('mkwa_rewards_store', 'mkwa_rewards_store_shortcode');
+    add_shortcode('mkwa_challenges', 'mkwa_active_challenges_shortcode');
+    add_shortcode('mkwa_leaderboard', 'mkwa_leaderboard_shortcode');
+}
+add_action('init', 'mkwa_register_shortcodes');
+
+/**
  * Shortcode: Member Dashboard
  */
 function mkwa_member_dashboard_shortcode() {
@@ -98,7 +119,6 @@ function mkwa_member_dashboard_shortcode() {
     <?php
     return ob_get_clean();
 }
-add_shortcode('mkwa_dashboard', 'mkwa_member_dashboard_shortcode');
 
 /**
  * Shortcode: Rewards Store
@@ -135,10 +155,9 @@ function mkwa_rewards_store_shortcode() {
     }
     return ob_get_clean();
 }
-add_shortcode('mkwa_rewards_store', 'mkwa_rewards_store_shortcode');
 
 /**
- * Shortcode: Challenges
+ * Shortcode: Active Challenges
  */
 function mkwa_active_challenges_shortcode() {
     $challenges = get_option('mkwa_fitness_challenges', []);
@@ -154,7 +173,6 @@ function mkwa_active_challenges_shortcode() {
     <?php
     return ob_get_clean();
 }
-add_shortcode('mkwa_challenges', 'mkwa_active_challenges_shortcode');
 
 /**
  * Shortcode: Leaderboard
@@ -174,4 +192,3 @@ function mkwa_leaderboard_shortcode() {
     <?php
     return ob_get_clean();
 }
-add_shortcode('mkwa_leaderboard', 'mkwa_leaderboard_shortcode');
