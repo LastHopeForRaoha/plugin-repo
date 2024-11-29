@@ -15,13 +15,13 @@ if (!defined('ABSPATH')) {
     exit; // Prevent direct access to the file.
 }
 
-// Define constants
+// Constants
 define('MKWA_FITNESS_PLUGIN_VERSION', '1.0');
 define('MKWA_FITNESS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('MKWA_FITNESS_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 /**
- * Load plugin text domain for translations.
+ * Load text domain for translations.
  */
 function mkwa_fitness_load_textdomain() {
     load_plugin_textdomain('mkwa-fitness-plugin', false, dirname(plugin_basename(__FILE__)) . '/languages');
@@ -29,145 +29,149 @@ function mkwa_fitness_load_textdomain() {
 add_action('plugins_loaded', 'mkwa_fitness_load_textdomain');
 
 /**
- * Register activation hook.
+ * Activation hook.
  */
 function mkwa_fitness_activate() {
-    if (!current_user_can('activate_plugins')) {
-        return;
-    }
-
-    // Add default options
-    add_option('mkwa_fitness_settings', [
-        'welcome_message' => 'Welcome to MKWA Fitness!',
-    ]);
+    add_option('mkwa_fitness_rewards', []);
+    add_option('mkwa_fitness_challenges', []);
+    add_option('mkwa_fitness_leaderboard', []);
 }
 register_activation_hook(__FILE__, 'mkwa_fitness_activate');
 
 /**
- * Register deactivation hook.
- */
-function mkwa_fitness_deactivate() {
-    if (!current_user_can('activate_plugins')) {
-        return;
-    }
-
-    // Cleanup options
-    delete_option('mkwa_fitness_settings');
-}
-register_deactivation_hook(__FILE__, 'mkwa_fitness_deactivate');
-
-/**
- * Initialize plugin functionality.
- */
-function mkwa_fitness_plugin_init() {
-    // Add initialization logic here if needed.
-}
-add_action('init', 'mkwa_fitness_plugin_init');
-
-/**
- * Add admin menu page.
+ * Admin Menu for Backend Management.
  */
 function mkwa_fitness_add_admin_menu() {
     add_menu_page(
-        'MKWA Fitness Settings',  // Page title
-        'MKWA Fitness',           // Menu title
-        'manage_options',         // Capability
-        'mkwa-fitness',           // Menu slug
-        'mkwa_fitness_settings_page', // Callback function
-        'dashicons-heart',        // Icon
-        2                         // Position
+        'MKWA Fitness Admin',
+        'MKWA Fitness',
+        'manage_options',
+        'mkwa-fitness',
+        'mkwa_fitness_admin_page',
+        'dashicons-star-filled',
+        2
     );
 }
 add_action('admin_menu', 'mkwa_fitness_add_admin_menu');
 
-/**
- * Admin settings page content.
- */
-function mkwa_fitness_settings_page() {
-    if (!current_user_can('manage_options')) {
-        return;
-    }
-
-    // Save settings if submitted
-    if (isset($_POST['mkwa_fitness_save_settings'])) {
-        check_admin_referer('mkwa_fitness_save_settings');
-        $welcome_message = sanitize_text_field($_POST['mkwa_fitness_welcome_message']);
-        update_option('mkwa_fitness_settings', ['welcome_message' => $welcome_message]);
-        echo '<div class="notice notice-success"><p>Settings saved successfully!</p></div>';
-    }
-
-    $settings = get_option('mkwa_fitness_settings');
+function mkwa_fitness_admin_page() {
     ?>
     <div class="wrap">
-        <h1>MKWA Fitness Plugin Settings</h1>
+        <h1>MKWA Fitness Admin Panel</h1>
+        <h2>Manage Rewards</h2>
         <form method="post" action="">
-            <?php wp_nonce_field('mkwa_fitness_save_settings'); ?>
-            <table class="form-table">
-                <tr>
-                    <th><label for="mkwa_fitness_welcome_message">Welcome Message</label></th>
-                    <td>
-                        <input type="text" id="mkwa_fitness_welcome_message" name="mkwa_fitness_welcome_message" 
-                               value="<?php echo esc_attr($settings['welcome_message']); ?>" class="regular-text">
-                    </td>
-                </tr>
-            </table>
-            <p class="submit">
-                <button type="submit" name="mkwa_fitness_save_settings" class="button button-primary">Save Settings</button>
-            </p>
+            <?php
+            if (isset($_POST['new_reward'])) {
+                $rewards = get_option('mkwa_fitness_rewards');
+                $rewards[] = sanitize_text_field($_POST['new_reward']);
+                update_option('mkwa_fitness_rewards', $rewards);
+                echo '<p>Reward added!</p>';
+            }
+            ?>
+            <input type="text" name="new_reward" placeholder="Enter reward name" required>
+            <button type="submit">Add Reward</button>
         </form>
+        <ul>
+            <h3>Current Rewards</h3>
+            <?php
+            $rewards = get_option('mkwa_fitness_rewards', []);
+            foreach ($rewards as $reward) {
+                echo '<li>' . esc_html($reward) . '</li>';
+            }
+            ?>
+        </ul>
     </div>
     <?php
 }
 
 /**
- * Add shortcodes for plugin functionality.
- */
-function mkwa_register_shortcodes() {
-    // Member dashboard
-    add_shortcode('mkwa_dashboard', 'mkwa_member_dashboard_shortcode');
-    // Rewards store
-    add_shortcode('mkwa_rewards_store', 'mkwa_rewards_store_shortcode');
-    // Challenges
-    add_shortcode('mkwa_challenges', 'mkwa_active_challenges_shortcode');
-    // Leaderboard
-    add_shortcode('mkwa_leaderboard', 'mkwa_leaderboard_shortcode');
-    // Welcome message (new)
-    add_shortcode('mkwa_fitness_welcome', 'mkwa_fitness_welcome_message_shortcode');
-}
-add_action('init', 'mkwa_register_shortcodes');
-
-/**
- * Shortcode callback for the welcome message.
- */
-function mkwa_fitness_welcome_message_shortcode() {
-    $settings = get_option('mkwa_fitness_settings');
-    return '<p>' . esc_html($settings['welcome_message']) . '</p>';
-}
-
-/**
- * Shortcode callback for the member dashboard.
+ * Shortcode: Member Dashboard
  */
 function mkwa_member_dashboard_shortcode() {
-    return '<h2>Member Dashboard</h2><p>This is the MKWA Fitness member dashboard.</p>';
+    $user_id = get_current_user_id();
+    $points = get_user_meta($user_id, 'mkwa_points', true) ?: 0;
+
+    ob_start();
+    ?>
+    <h2>Your Dashboard</h2>
+    <p><strong>Points:</strong> <?php echo $points; ?></p>
+    <?php
+    return ob_get_clean();
 }
+add_shortcode('mkwa_dashboard', 'mkwa_member_dashboard_shortcode');
 
 /**
- * Shortcode callback for the rewards store.
+ * Shortcode: Rewards Store
  */
 function mkwa_rewards_store_shortcode() {
-    return '<h2>Rewards Store</h2><p>Here you can redeem points for rewards.</p>';
+    $user_id = get_current_user_id();
+    $points = get_user_meta($user_id, 'mkwa_points', true) ?: 0;
+    $rewards = get_option('mkwa_fitness_rewards', []);
+
+    ob_start();
+    ?>
+    <h2>Rewards Store</h2>
+    <p>You have <strong><?php echo $points; ?></strong> points.</p>
+    <ul>
+        <?php foreach ($rewards as $reward) : ?>
+            <li>
+                <?php echo esc_html($reward); ?>
+                <?php if ($points >= 100) : ?>
+                    <form method="post" style="display:inline;">
+                        <input type="hidden" name="redeem_reward" value="<?php echo esc_attr($reward); ?>">
+                        <button type="submit">Redeem</button>
+                    </form>
+                <?php else : ?>
+                    <span>Not enough points</span>
+                <?php endif; ?>
+            </li>
+        <?php endforeach; ?>
+    </ul>
+    <?php
+    if (isset($_POST['redeem_reward'])) {
+        $reward = sanitize_text_field($_POST['redeem_reward']);
+        update_user_meta($user_id, 'mkwa_points', $points - 100);
+        echo '<p>Redeemed ' . esc_html($reward) . '!</p>';
+    }
+    return ob_get_clean();
 }
+add_shortcode('mkwa_rewards_store', 'mkwa_rewards_store_shortcode');
 
 /**
- * Shortcode callback for active challenges.
+ * Shortcode: Challenges
  */
 function mkwa_active_challenges_shortcode() {
-    return '<h2>Active Challenges</h2><p>Participate in the latest fitness challenges!</p>';
+    $challenges = get_option('mkwa_fitness_challenges', []);
+
+    ob_start();
+    ?>
+    <h2>Active Challenges</h2>
+    <ul>
+        <?php foreach ($challenges as $challenge) : ?>
+            <li><?php echo esc_html($challenge); ?></li>
+        <?php endforeach; ?>
+    </ul>
+    <?php
+    return ob_get_clean();
 }
+add_shortcode('mkwa_challenges', 'mkwa_active_challenges_shortcode');
 
 /**
- * Shortcode callback for the leaderboard.
+ * Shortcode: Leaderboard
  */
 function mkwa_leaderboard_shortcode() {
-    return '<h2>Leaderboard</h2><p>See the top members on the leaderboard.</p>';
+    $leaderboard = get_option('mkwa_fitness_leaderboard', []);
+    arsort($leaderboard);
+
+    ob_start();
+    ?>
+    <h2>Leaderboard</h2>
+    <ol>
+        <?php foreach ($leaderboard as $user_id => $points) : ?>
+            <li><?php echo esc_html(get_userdata($user_id)->display_name); ?> - <?php echo esc_html($points); ?> points</li>
+        <?php endforeach; ?>
+    </ol>
+    <?php
+    return ob_get_clean();
 }
+add_shortcode('mkwa_leaderboard', 'mkwa_leaderboard_shortcode');
