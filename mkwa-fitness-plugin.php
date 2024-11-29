@@ -1,194 +1,280 @@
 <?php
-/*
-Plugin Name: MKWA Fitness Plugin
-Plugin URI: https://example.com/mkwa-fitness-plugin
-Description: A custom plugin for MKWA Fitness to manage features and integrations.
-Version: 1.0
-Author: Your Name
-Author URI: https://example.com
-Text Domain: mkwa-fitness-plugin
-Domain Path: /languages
-License: GPL2
-*/
+/**
+ * Plugin Name: MKWA Fitness Plugin
+ * Description: A comprehensive plugin for MKWA Fitness, including gamification, member profiles, rewards, challenges, leaderboards, and more.
+ * Version: 1.4
+ * Author: MKWA Fitness Team
+ * License: GPL2
+ */
 
 if (!defined('ABSPATH')) {
-    exit; // Prevent direct access to the file.
+    exit; // Exit if accessed directly
 }
 
-// Constants
-define('MKWA_FITNESS_PLUGIN_VERSION', '1.0');
-define('MKWA_FITNESS_PLUGIN_DIR', plugin_dir_path(__FILE__));
-define('MKWA_FITNESS_PLUGIN_URL', plugin_dir_url(__FILE__));
-
+// Enable debugging (temporary)
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);<?php
 /**
- * Load text domain for translations.
+ * Plugin Name: MKWA Fitness Plugin
+ * Description: A comprehensive plugin for MKWA Fitness, including gamification, member profiles, rewards, challenges, leaderboards, and more.
+ * Version: 1.4
+ * Author: MKWA Fitness Team
+ * License: GPL2
  */
-function mkwa_fitness_load_textdomain() {
-    load_plugin_textdomain('mkwa-fitness-plugin', false, dirname(plugin_basename(__FILE__)) . '/languages');
-}
-add_action('plugins_loaded', 'mkwa_fitness_load_textdomain');
 
-/**
- * Activation hook: Initialize options.
- */
-function mkwa_fitness_activate() {
-    add_option('mkwa_fitness_rewards', []);
-    add_option('mkwa_fitness_challenges', []);
-    add_option('mkwa_fitness_leaderboard', []);
-}
-register_activation_hook(__FILE__, 'mkwa_fitness_activate');
-
-/**
- * Deactivation hook: Clean up options.
- */
-function mkwa_fitness_deactivate() {
-    delete_option('mkwa_fitness_rewards');
-    delete_option('mkwa_fitness_challenges');
-    delete_option('mkwa_fitness_leaderboard');
-}
-register_deactivation_hook(__FILE__, 'mkwa_fitness_deactivate');
-
-/**
- * Admin Menu for Backend Management.
- */
-function mkwa_fitness_add_admin_menu() {
-    add_menu_page(
-        'MKWA Fitness Admin',
-        'MKWA Fitness',
-        'manage_options',
-        'mkwa-fitness',
-        'mkwa_fitness_admin_page',
-        'dashicons-star-filled',
-        2
-    );
-}
-add_action('admin_menu', 'mkwa_fitness_add_admin_menu');
-
-function mkwa_fitness_admin_page() {
-    ?>
-    <div class="wrap">
-        <h1>MKWA Fitness Admin Panel</h1>
-        <h2>Manage Rewards</h2>
-        <form method="post" action="">
-            <?php
-            if (isset($_POST['new_reward'])) {
-                $rewards = get_option('mkwa_fitness_rewards');
-                $rewards[] = sanitize_text_field($_POST['new_reward']);
-                update_option('mkwa_fitness_rewards', $rewards);
-                echo '<p>Reward added!</p>';
-            }
-            ?>
-            <input type="text" name="new_reward" placeholder="Enter reward name" required>
-            <button type="submit">Add Reward</button>
-        </form>
-        <ul>
-            <h3>Current Rewards</h3>
-            <?php
-            $rewards = get_option('mkwa_fitness_rewards', []);
-            foreach ($rewards as $reward) {
-                echo '<li>' . esc_html($reward) . '</li>';
-            }
-            ?>
-        </ul>
-    </div>
-    <?php
+if (!defined('ABSPATH')) {
+    exit; // Exit if accessed directly
 }
 
-/**
- * Register shortcodes.
- */
-function mkwa_register_shortcodes() {
-    add_shortcode('mkwa_dashboard', 'mkwa_member_dashboard_shortcode');
-    add_shortcode('mkwa_rewards_store', 'mkwa_rewards_store_shortcode');
-    add_shortcode('mkwa_challenges', 'mkwa_active_challenges_shortcode');
-    add_shortcode('mkwa_leaderboard', 'mkwa_leaderboard_shortcode');
-}
-add_action('init', 'mkwa_register_shortcodes');
+// Enable debugging (temporary)
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 
-/**
- * Shortcode: Member Dashboard
- */
-function mkwa_member_dashboard_shortcode() {
-    $user_id = get_current_user_id();
-    $points = get_user_meta($user_id, 'mkwa_points', true) ?: 0;
+// Define constants
+define('MKWA_PLUGIN_PATH', plugin_dir_path(__FILE__));
+define('MKWA_PLUGIN_URL', plugin_dir_url(__FILE__));
+define('MKWA_LOG_FILE', MKWA_PLUGIN_PATH . 'mkwa-plugin-errors.log'); // Log file for errors
 
-    ob_start();
-    ?>
-    <h2>Your Dashboard</h2>
-    <p><strong>Points:</strong> <?php echo $points; ?></p>
-    <?php
-    return ob_get_clean();
+// Custom logging function
+function mkwa_log($message) {
+    $timestamp = date('Y-m-d H:i:s');
+    error_log("[$timestamp] $message\n", 3, MKWA_LOG_FILE);
 }
 
-/**
- * Shortcode: Rewards Store
- */
-function mkwa_rewards_store_shortcode() {
-    $user_id = get_current_user_id();
-    $points = get_user_meta($user_id, 'mkwa_points', true) ?: 0;
-    $rewards = get_option('mkwa_fitness_rewards', []);
+// Log plugin initialization
+mkwa_log('MKWA Fitness Plugin: Initialization started.');
 
-    ob_start();
-    ?>
-    <h2>Rewards Store</h2>
-    <p>You have <strong><?php echo $points; ?></strong> points.</p>
-    <ul>
-        <?php foreach ($rewards as $reward) : ?>
-            <li>
-                <?php echo esc_html($reward); ?>
-                <?php if ($points >= 100) : ?>
-                    <form method="post" style="display:inline;">
-                        <input type="hidden" name="redeem_reward" value="<?php echo esc_attr($reward); ?>">
-                        <button type="submit">Redeem</button>
-                    </form>
-                <?php else : ?>
-                    <span>Not enough points</span>
-                <?php endif; ?>
-            </li>
-        <?php endforeach; ?>
-    </ul>
-    <?php
-    if (isset($_POST['redeem_reward'])) {
-        $reward = sanitize_text_field($_POST['redeem_reward']);
-        update_user_meta($user_id, 'mkwa_points', $points - 100);
-        echo '<p>Redeemed ' . esc_html($reward) . '!</p>';
+// Include necessary files with error logging and failure handling
+$include_files = [
+    'includes/member-profiles.php',
+    'includes/rewards-store.php',
+    'includes/challenges-system.php',
+    'includes/leaderboard-system.php',
+    'includes/rewards-management.php',
+    'includes/leaderboard-management.php',
+    'includes/admin-menu.php'
+];
+
+foreach ($include_files as $file) {
+    $file_path = MKWA_PLUGIN_PATH . $file;
+    if (file_exists($file_path)) {
+        include_once $file_path;
+        mkwa_log("Included file: $file");
+    } else {
+        mkwa_log("Error: Missing required file - $file_path");
+        wp_die("Required file is missing: $file_path. Please ensure all plugin files are properly installed.");
     }
-    return ob_get_clean();
 }
 
-/**
- * Shortcode: Active Challenges
- */
-function mkwa_active_challenges_shortcode() {
-    $challenges = get_option('mkwa_fitness_challenges', []);
+// Enqueue assets
+function mkwa_enqueue_assets() {
+    wp_enqueue_style('mkwa-styles', MKWA_PLUGIN_URL . 'assets/css/styles.css');
+    mkwa_log('Assets enqueued.');
+}
+add_action('wp_enqueue_scripts', 'mkwa_enqueue_assets');
 
-    ob_start();
-    ?>
-    <h2>Active Challenges</h2>
-    <ul>
-        <?php foreach ($challenges as $challenge) : ?>
-            <li><?php echo esc_html($challenge); ?></li>
-        <?php endforeach; ?>
-    </ul>
-    <?php
-    return ob_get_clean();
+// Register admin menu
+function mkwa_register_admin_menu() {
+    mkwa_log('Registering admin menu...');
+    add_menu_page(
+        'MKWA Fitness',              // Page title
+        'MKWA Fitness',              // Menu title
+        'manage_options',            // Capability
+        'mkwa-fitness',              // Menu slug
+        'mkwa_admin_dashboard',      // Callback function
+        'dashicons-awards',          // Icon
+        6                            // Position
+    );
+    mkwa_log('Admin menu registered.');
+}
+add_action('admin_menu', 'mkwa_register_admin_menu');
+
+// Admin dashboard content
+function mkwa_admin_dashboard() {
+    mkwa_log('Admin dashboard loaded.');
+    echo '<div class="wrap"><h1>Welcome to MKWA Fitness Plugin</h1>';
+    echo '<p>This is the admin dashboard for managing rewards, challenges, and leaderboards.</p></div>';
 }
 
-/**
- * Shortcode: Leaderboard
- */
-function mkwa_leaderboard_shortcode() {
-    $leaderboard = get_option('mkwa_fitness_leaderboard', []);
-    arsort($leaderboard);
+// Activation hook
+function mkwa_activate_plugin() {
+    global $wpdb;
+    mkwa_log('Activation started.');
 
-    ob_start();
-    ?>
-    <h2>Leaderboard</h2>
-    <ol>
-        <?php foreach ($leaderboard as $user_id => $points) : ?>
-            <li><?php echo esc_html(get_userdata($user_id)->display_name); ?> - <?php echo esc_html($points); ?> points</li>
-        <?php endforeach; ?>
-    </ol>
-    <?php
-    return ob_get_clean();
+    try {
+        if (function_exists('mkwa_create_rewards_table')) {
+            mkwa_create_rewards_table();
+            mkwa_log('Rewards table created.');
+        } else {
+            throw new Exception('mkwa_create_rewards_table function not found.');
+        }
+
+        if (function_exists('mkwa_create_rewards_log_table')) {
+            mkwa_create_rewards_log_table();
+            mkwa_log('Rewards log table created.');
+        } else {
+            throw new Exception('mkwa_create_rewards_log_table function not found.');
+        }
+
+        if (function_exists('mkwa_create_leaderboard_table')) {
+            mkwa_create_leaderboard_table();
+            mkwa_log('Leaderboard table created.');
+        } else {
+            throw new Exception('mkwa_create_leaderboard_table function not found.');
+        }
+
+        if (function_exists('mkwa_create_challenges_table')) {
+            mkwa_create_challenges_table();
+            mkwa_log('Challenges table created.');
+        } else {
+            throw new Exception('mkwa_create_challenges_table function not found.');
+        }
+    } catch (Exception $e) {
+        mkwa_log('Activation error: ' . $e->getMessage());
+        wp_die('Activation failed: ' . $e->getMessage());
+    }
+
+    mkwa_log('Activation completed.');
 }
+register_activation_hook(__FILE__, 'mkwa_activate_plugin');
+
+// Log fatal errors on shutdown
+register_shutdown_function(function () {
+    $last_error = error_get_last();
+    if ($last_error && in_array($last_error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        $timestamp = date('Y-m-d H:i:s');
+        $error_message = "[$timestamp] Fatal Error: {$last_error['message']} in {$last_error['file']} on line {$last_error['line']}\n";
+        error_log($error_message, 3, MKWA_LOG_FILE);
+        wp_die("A critical error occurred. Please check the MKWA Plugin Error log for more details.");
+    }
+});
+
+// Log plugin load completion
+mkwa_log('MKWA Fitness Plugin: Initialization completed.');
+?>
+
+error_reporting(E_ALL);
+
+// Define constants
+define('MKWA_PLUGIN_PATH', plugin_dir_path(__FILE__));
+define('MKWA_PLUGIN_URL', plugin_dir_url(__FILE__));
+define('MKWA_LOG_FILE', MKWA_PLUGIN_PATH . 'mkwa-plugin-errors.log'); // Log file for errors
+
+// Custom logging function
+function mkwa_log($message) {
+    $timestamp = date('Y-m-d H:i:s');
+    error_log("[$timestamp] $message\n", 3, MKWA_LOG_FILE);
+}
+
+// Log plugin initialization
+mkwa_log('MKWA Fitness Plugin: Initialization started.');
+
+// Include necessary files with error logging and failure handling
+$include_files = [
+    'includes/member-profiles.php',
+    'includes/rewards-store.php',
+    'includes/challenges-system.php',
+    'includes/leaderboard-system.php',
+    'includes/rewards-management.php',
+    'includes/leaderboard-management.php',
+    'includes/admin-menu.php'
+];
+
+foreach ($include_files as $file) {
+    $file_path = MKWA_PLUGIN_PATH . $file;
+    if (file_exists($file_path)) {
+        include_once $file_path;
+        mkwa_log("Included file: $file");
+    } else {
+        mkwa_log("Error: Missing required file - $file_path");
+        wp_die("Required file is missing: $file_path. Please ensure all plugin files are properly installed.");
+    }
+}
+
+// Enqueue assets
+function mkwa_enqueue_assets() {
+    wp_enqueue_style('mkwa-styles', MKWA_PLUGIN_URL . 'assets/css/styles.css');
+    mkwa_log('Assets enqueued.');
+}
+add_action('wp_enqueue_scripts', 'mkwa_enqueue_assets');
+
+// Register admin menu
+function mkwa_register_admin_menu() {
+    mkwa_log('Registering admin menu...');
+    add_menu_page(
+        'MKWA Fitness',              // Page title
+        'MKWA Fitness',              // Menu title
+        'manage_options',            // Capability
+        'mkwa-fitness',              // Menu slug
+        'mkwa_admin_dashboard',      // Callback function
+        'dashicons-awards',          // Icon
+        6                            // Position
+    );
+    mkwa_log('Admin menu registered.');
+}
+add_action('admin_menu', 'mkwa_register_admin_menu');
+
+// Admin dashboard content
+function mkwa_admin_dashboard() {
+    mkwa_log('Admin dashboard loaded.');
+    echo '<div class="wrap"><h1>Welcome to MKWA Fitness Plugin</h1>';
+    echo '<p>This is the admin dashboard for managing rewards, challenges, and leaderboards.</p></div>';
+}
+
+// Activation hook
+function mkwa_activate_plugin() {
+    global $wpdb;
+    mkwa_log('Activation started.');
+
+    try {
+        if (function_exists('mkwa_create_rewards_table')) {
+            mkwa_create_rewards_table();
+            mkwa_log('Rewards table created.');
+        } else {
+            throw new Exception('mkwa_create_rewards_table function not found.');
+        }
+
+        if (function_exists('mkwa_create_rewards_log_table')) {
+            mkwa_create_rewards_log_table();
+            mkwa_log('Rewards log table created.');
+        } else {
+            throw new Exception('mkwa_create_rewards_log_table function not found.');
+        }
+
+        if (function_exists('mkwa_create_leaderboard_table')) {
+            mkwa_create_leaderboard_table();
+            mkwa_log('Leaderboard table created.');
+        } else {
+            throw new Exception('mkwa_create_leaderboard_table function not found.');
+        }
+
+        if (function_exists('mkwa_create_challenges_table')) {
+            mkwa_create_challenges_table();
+            mkwa_log('Challenges table created.');
+        } else {
+            throw new Exception('mkwa_create_challenges_table function not found.');
+        }
+    } catch (Exception $e) {
+        mkwa_log('Activation error: ' . $e->getMessage());
+        wp_die('Activation failed: ' . $e->getMessage());
+    }
+
+    mkwa_log('Activation completed.');
+}
+register_activation_hook(__FILE__, 'mkwa_activate_plugin');
+
+// Log fatal errors on shutdown
+register_shutdown_function(function () {
+    $last_error = error_get_last();
+    if ($last_error && in_array($last_error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        $timestamp = date('Y-m-d H:i:s');
+        $error_message = "[$timestamp] Fatal Error: {$last_error['message']} in {$last_error['file']} on line {$last_error['line']}\n";
+        error_log($error_message, 3, MKWA_LOG_FILE);
+        wp_die("A critical error occurred. Please check the MKWA Plugin Error log for more details.");
+    }
+});
+
+// Log plugin load completion
+mkwa_log('MKWA Fitness Plugin: Initialization completed.');
+?>
