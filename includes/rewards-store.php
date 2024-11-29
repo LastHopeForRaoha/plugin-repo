@@ -91,4 +91,11 @@ function mkwa_rewards_store_shortcode() {
     return ob_get_clean();
 }
 add_shortcode('mkwa_rewards_store', 'mkwa_rewards_store_shortcode');
+
+// Ensure tables exist during activation
+function mkwa_create_rewards_tables() {
+    mkwa_create_rewards_table();
+    mkwa_create_rewards_log_table();
+}
+register_activation_hook(__FILE__, 'mkwa_create_rewards_tables');
 ?>
