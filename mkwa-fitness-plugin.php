@@ -26,16 +26,18 @@ define('MKWA_FITNESS_PLUGIN_URL', plugin_dir_url(__FILE__));
 function mkwa_fitness_load_textdomain() {
     load_plugin_textdomain('mkwa-fitness-plugin', false, dirname(plugin_basename(__FILE__)) . '/languages');
 }
-add_action('init', 'mkwa_fitness_load_textdomain');
+add_action('plugins_loaded', 'mkwa_fitness_load_textdomain');
 
 /**
  * Register activation hook.
  */
 function mkwa_fitness_activate() {
-    // Add activation logic here, e.g., creating default options or database tables.
+    // Activation logic
     if (!current_user_can('activate_plugins')) {
         return;
     }
+
+    // Set default options or create database tables if needed
     update_option('mkwa_fitness_plugin_version', MKWA_FITNESS_PLUGIN_VERSION);
 }
 register_activation_hook(__FILE__, 'mkwa_fitness_activate');
@@ -44,10 +46,12 @@ register_activation_hook(__FILE__, 'mkwa_fitness_activate');
  * Register deactivation hook.
  */
 function mkwa_fitness_deactivate() {
-    // Add deactivation logic here, e.g., cleaning up temporary options.
+    // Cleanup logic on deactivation
     if (!current_user_can('activate_plugins')) {
         return;
     }
+
+    // Remove options or cleanup tasks
     delete_option('mkwa_fitness_plugin_version');
 }
 register_deactivation_hook(__FILE__, 'mkwa_fitness_deactivate');
@@ -56,8 +60,8 @@ register_deactivation_hook(__FILE__, 'mkwa_fitness_deactivate');
  * Initialize plugin functionality.
  */
 function mkwa_fitness_plugin_init() {
-    // Add main plugin functionality here.
-    // Example: Register custom post types, enqueue scripts, add shortcodes, etc.
+    // Main plugin functionality
+    // Example: Register custom post types, enqueue scripts, or add shortcodes.
 }
 add_action('init', 'mkwa_fitness_plugin_init');
 
