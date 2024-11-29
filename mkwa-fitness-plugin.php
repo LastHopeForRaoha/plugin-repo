@@ -6,54 +6,83 @@ Description: A custom plugin for MKWA Fitness to manage features and integration
 Version: 1.0
 Author: Your Name
 Author URI: https://example.com
+Text Domain: mkwa-fitness-plugin
+Domain Path: /languages
 License: GPL2
 */
 
-// Prevent direct access to the file.
 if (!defined('ABSPATH')) {
-    exit; // Exit if accessed directly.
+    exit; // Prevent direct access to the file.
 }
 
-// Define constants for the plugin.
+// Define constants
 define('MKWA_FITNESS_PLUGIN_VERSION', '1.0');
 define('MKWA_FITNESS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('MKWA_FITNESS_PLUGIN_URL', plugin_dir_url(__FILE__));
 
-// Include required files (use this section to include additional PHP files).
-// Example:
-// include MKWA_FITNESS_PLUGIN_DIR . 'includes/some-feature.php';
+/**
+ * Load plugin text domain for translations.
+ */
+function mkwa_fitness_load_textdomain() {
+    load_plugin_textdomain('mkwa-fitness-plugin', false, dirname(plugin_basename(__FILE__)) . '/languages');
+}
+add_action('init', 'mkwa_fitness_load_textdomain');
 
 /**
- * Function to run on plugin activation.
+ * Register activation hook.
  */
 function mkwa_fitness_activate() {
-    // Add your activation logic here (e.g., creating database tables or setting default options).
+    // Add activation logic here, e.g., creating default options or database tables.
     if (!current_user_can('activate_plugins')) {
         return;
     }
-    // Example activation logic:
-    // update_option('mkwa_fitness_version', MKWA_FITNESS_PLUGIN_VERSION);
+    update_option('mkwa_fitness_plugin_version', MKWA_FITNESS_PLUGIN_VERSION);
 }
 register_activation_hook(__FILE__, 'mkwa_fitness_activate');
 
 /**
- * Function to run on plugin deactivation.
+ * Register deactivation hook.
  */
 function mkwa_fitness_deactivate() {
-    // Add your deactivation logic here (e.g., cleaning up temporary data).
+    // Add deactivation logic here, e.g., cleaning up temporary options.
     if (!current_user_can('activate_plugins')) {
         return;
     }
-    // Example deactivation logic:
-    // delete_option('mkwa_fitness_version');
+    delete_option('mkwa_fitness_plugin_version');
 }
 register_deactivation_hook(__FILE__, 'mkwa_fitness_deactivate');
 
 /**
- * Main plugin functionality.
+ * Initialize plugin functionality.
  */
-function mkwa_fitness_init() {
-    // Add initialization logic here.
-    // For example, enqueue scripts, register custom post types, or add shortcodes.
+function mkwa_fitness_plugin_init() {
+    // Add main plugin functionality here.
+    // Example: Register custom post types, enqueue scripts, add shortcodes, etc.
 }
-add_action('init', 'mkwa_fitness_init');
+add_action('init', 'mkwa_fitness_plugin_init');
+
+/**
+ * Add admin menu page.
+ */
+function mkwa_fitness_add_admin_menu() {
+    add_menu_page(
+        'MKWA Fitness Settings',  // Page title
+        'MKWA Fitness',           // Menu title
+        'manage_options',         // Capability
+        'mkwa-fitness',           // Menu slug
+        'mkwa_fitness_settings_page', // Callback function
+        'dashicons-heart',        // Icon
+        2                         // Position
+    );
+}
+add_action('admin_menu', 'mkwa_fitness_add_admin_menu');
+
+/**
+ * Admin settings page content.
+ */
+function mkwa_fitness_settings_page() {
+    echo '<div class="wrap">';
+    echo '<h1>MKWA Fitness Plugin Settings</h1>';
+    echo '<p>Welcome to the MKWA Fitness Plugin settings page.</p>';
+    echo '</div>';
+}
