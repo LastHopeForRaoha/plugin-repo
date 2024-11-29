@@ -38,7 +38,7 @@ $include_files = [
     'includes/leaderboard-system.php',
     'includes/rewards-management.php',
     'includes/leaderboard-management.php',
-    'includes/admin-menu.php',
+    'includes/admin-menu.php', // Admin menu logic is now entirely in this file.
 ];
 
 foreach ($include_files as $file) {
@@ -59,29 +59,6 @@ function mkwa_enqueue_assets() {
     mkwa_log('Assets enqueued.');
 }
 add_action('wp_enqueue_scripts', 'mkwa_enqueue_assets');
-
-// Register admin menu
-function mkwa_register_admin_menu() {
-    mkwa_log('Registering admin menu...');
-    add_menu_page(
-        'MKWA Fitness',              // Page title
-        'MKWA Fitness',              // Menu title
-        'manage_options',            // Capability
-        'mkwa-fitness',              // Menu slug
-        'mkwa_admin_dashboard',      // Callback function
-        'dashicons-awards',          // Icon
-        6                            // Position
-    );
-    mkwa_log('Admin menu registered.');
-}
-add_action('admin_menu', 'mkwa_register_admin_menu');
-
-// Admin dashboard content
-function mkwa_admin_dashboard() {
-    mkwa_log('Admin dashboard loaded.');
-    echo '<div class="wrap"><h1>Welcome to MKWA Fitness Plugin</h1>';
-    echo '<p>This is the admin dashboard for managing rewards, challenges, and leaderboards.</p></div>';
-}
 
 // Activation hook
 function mkwa_activate_plugin() {
@@ -137,4 +114,3 @@ register_shutdown_function(function () {
 
 // Log plugin load completion
 mkwa_log('MKWA Fitness Plugin: Initialization completed.');
-?>
