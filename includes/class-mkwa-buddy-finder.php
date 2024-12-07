@@ -22,7 +22,7 @@ class MKWABuddyFinder {
         global $wpdb;
         $charset_collate = $wpdb->get_charset_collate();
 
-        $sql = "CREATE TABLE " . self::$table_name . " (
+        $sql = "CREATE TABLE IF NOT EXISTS " . self::$table_name . " (
             id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             user_id BIGINT(20) UNSIGNED NOT NULL,
             availability TEXT NOT NULL,
@@ -43,12 +43,25 @@ class MKWABuddyFinder {
             'fitness_goals' => maybe_serialize($fitness_goals),
             'opt_in' => $opt_in ? 1 : 0,
         ];
-        $existing = $wpdb->get_var($wpdb->prepare("SELECT id FROM " . self::$table_name . " WHERE user_id = %d", $user_id));
+        $existing = $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM " . self::$table_name . " WHERE user_id = %d",
+            $user_id
+        ));
         if ($existing) {
-            $wpdb->update(self::$table_name, $data, ['user_id' => $user_id], ['%s', '%s', '%d'], ['%d']);
+            $wpdb->update(
+                self::$table_name,
+                $data,
+                ['user_id' => $user_id],
+                ['%s', '%s', '%d'],
+                ['%d']
+            );
         } else {
             $data['user_id'] = $user_id;
-            $wpdb->insert(self::$table_name, $data, ['%d', '%s', '%s', '%d']);
+            $wpdb->insert(
+                self::$table_name,
+                $data,
+                ['%d', '%s', '%s', '%d']
+            );
         }
 
         // Award points for updating preferences
@@ -57,7 +70,10 @@ class MKWABuddyFinder {
 
     public static function get_user_preferences($user_id) {
         global $wpdb;
-        $result = $wpdb->get_row($wpdb->prepare("SELECT * FROM " . self::$table_name . " WHERE user_id = %d", $user_id));
+        $result = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM " . self::$table_name . " WHERE user_id = %d",
+            $user_id
+        ));
         if ($result) {
             $result->availability = maybe_unserialize($result->availability);
             $result->fitness_goals = maybe_unserialize($result->fitness_goals);
@@ -97,11 +113,17 @@ class MKWABuddyFinder {
     }
 
     private static function has_common_availability($avail1, $avail2) {
-        return !empty(array_intersect($avail1, $avail2));
+        if (is_array($avail1) && is_array($avail2)) {
+            return !empty(array_intersect($avail1, $avail2));
+        }
+        return false;
     }
 
     private static function has_common_goals($goals1, $goals2) {
-        return !empty(array_intersect($goals1, $goals2));
+        if (is_array($goals1) && is_array($goals2)) {
+            return !empty(array_intersect($goals1, $goals2));
+        }
+        return false;
     }
 
     public static function cleanup_inactive_entries() {
@@ -112,3 +134,5 @@ class MKWABuddyFinder {
         ));
     }
 }
+
+MKWABuddyFinder::init();

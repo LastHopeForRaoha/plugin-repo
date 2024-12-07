@@ -12,14 +12,18 @@ class MKWADailyQuests {
 
         // Register admin menu
         add_action('admin_menu', [__CLASS__, 'add_admin_menu']);
-        // Add daily quests for all users via cron (example: daily at midnight)
+        // Add daily quests for all users via cron
         add_action('mkwa_assign_daily_quests', [__CLASS__, 'assign_daily_quests_to_all']);
+        // Schedule daily cron if not already scheduled
+        if (!wp_next_scheduled('mkwa_assign_daily_quests')) {
+            wp_schedule_event(time(), 'daily', 'mkwa_assign_daily_quests');
+        }
     }
 
     public static function create_table() {
         global $wpdb;
         $charset_collate = $wpdb->get_charset_collate();
-        $sql = "CREATE TABLE " . self::$table_name . " (
+        $sql = "CREATE TABLE IF NOT EXISTS " . self::$table_name . " (
             id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             user_id BIGINT(20) UNSIGNED NOT NULL,
             quest_name VARCHAR(255) NOT NULL,
@@ -164,3 +168,4 @@ class MKWADailyQuests {
         }
     }
 }
+MKWADailyQuests::init();

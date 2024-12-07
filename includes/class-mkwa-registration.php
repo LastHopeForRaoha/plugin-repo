@@ -19,8 +19,9 @@ class MKWARegistration {
             return '<p>You are already registered and logged in.</p>';
         }
 
-        ob_start(); ?>
-        <form id="mkwa-registration" action="<?php echo esc_url(admin_url('admin-ajax.php')); ?>" method="post">
+        ob_start();
+        ?>
+        <form id="mkwa-registration" action="<?php echo esc_url(admin_url('admin-ajax.php')); ?>" method="post" enctype="multipart/form-data">
             <p>
                 <label for="username">Username</label>
                 <input type="text" name="username" id="username" required>
@@ -38,27 +39,35 @@ class MKWARegistration {
                 <textarea name="bio" id="bio" rows="4"></textarea>
             </p>
             <p>
+                <label for="profile_picture">Profile Picture (optional)</label>
+                <input type="file" name="profile_picture" id="profile_picture" accept="image/*">
+            </p>
+            <p>
                 <button type="submit">Register</button>
             </p>
             <input type="hidden" name="action" value="mkwa_register_user">
             <?php wp_nonce_field('mkwa_register_user', 'mkwa_nonce'); ?>
         </form>
         <div id="mkwa-registration-response"></div>
-        <?php return ob_get_clean();
+        <?php
+        return ob_get_clean();
     }
 
     /**
      * Handle user registration via AJAX.
      */
     public static function register_user() {
+        // Verify nonce
         if (!isset($_POST['mkwa_nonce']) || !wp_verify_nonce($_POST['mkwa_nonce'], 'mkwa_register_user')) {
             wp_send_json_error('Invalid request.');
         }
 
+        // Sanitize input data
         $username = sanitize_text_field($_POST['username']);
         $email = sanitize_email($_POST['email']);
         $password = sanitize_text_field($_POST['password']);
         $bio = sanitize_textarea_field($_POST['bio']);
+        $profile_picture = $_FILES['profile_picture'];
 
         // Validate required fields
         if (empty($username) || empty($email) || empty($password)) {
@@ -79,13 +88,22 @@ class MKWARegistration {
         // Add bio to user meta
         update_user_meta($user_id, 'mkwa_bio', $bio);
 
+        // Handle profile picture upload
+        if ($profile_picture && !empty($profile_picture['tmp_name'])) {
+            $upload = wp_handle_upload($profile_picture, ['test_form' => false]);
+            if (isset($upload['url'])) {
+                update_user_meta($user_id, 'profile_picture', $upload['url']);
+            }
+        }
+
         // Initialize gamification features
         MKWAPointsSystem::add_points($user_id, 0, 'Welcome to MKWA Fitness');
         MKWABadgesSystem::assign_badge($user_id, 'welcome_badge', 'Welcome to the MKWA community!');
 
+        // Send success response
         wp_send_json_success('Registration successful! You can now log in.');
     }
 }
 
 // Initialize the MKWARegistration class
-MKWAPointsSystem::init();
+MKWARegistration::init();

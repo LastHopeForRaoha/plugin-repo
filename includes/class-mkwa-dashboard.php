@@ -9,9 +9,11 @@ class MKWADashboard {
         add_shortcode('mkwa_dashboard', [__CLASS__, 'display_dashboard']);
         // Add AJAX handler for profile updates
         add_action('wp_ajax_mkwa_update_profile', [__CLASS__, 'update_profile']);
-        add_action('wp_ajax_nopriv_mkwa_update_profile', [__CLASS__, 'update_profile']);
     }
 
+    /**
+     * Display the user dashboard.
+     */
     public static function display_dashboard($atts) {
         if (!is_user_logged_in()) {
             return '<p>Please log in to view your dashboard.</p>';
@@ -27,17 +29,17 @@ class MKWADashboard {
         ob_start();
         ?>
         <div class="mkwa-dashboard">
-            <h2>Welcome, <?php echo esc_html($profile['display_name']); ?></h2>
-            <img src="<?php echo esc_url(get_user_meta($user_id, 'profile_picture', true)); ?>" alt="Profile Picture" class="profile-picture">
-            <p><strong>Bio:</strong> <?php echo esc_html($profile['bio']); ?></p>
-            
+            <h2>Welcome, <?php echo esc_html($profile['display_name'] ?: 'Member'); ?></h2>
+            <img src="<?php echo esc_url(get_user_meta($user_id, 'profile_picture', true) ?: plugin_dir_url(__FILE__) . 'assets/default-avatar.png'); ?>" alt="Profile Picture" class="profile-picture">
+            <p><strong>Bio:</strong> <?php echo esc_html($profile['bio'] ?: 'No bio provided.'); ?></p>
+
             <div class="progress-section">
                 <h3>Your Progress</h3>
-                <p><strong>Total Points:</strong> <?php echo esc_html($profile['points']); ?></p>
-                <p><strong>Current Level:</strong> <?php echo esc_html($level['title']); ?></p>
-                <p><strong>Next Level:</strong> <?php echo esc_html($level['next_title']); ?> (<?php echo esc_html($level['points_to_next']); ?> points to go)</p>
+                <p><strong>Total Points:</strong> <?php echo esc_html($profile['points'] ?: 0); ?></p>
+                <p><strong>Current Level:</strong> <?php echo esc_html($level['title'] ?: 'N/A'); ?></p>
+                <p><strong>Next Level:</strong> <?php echo esc_html($level['next_title'] ?: 'N/A'); ?> (<?php echo esc_html($level['points_to_next'] ?: 0); ?> points to go)</p>
                 <div class="progress-bar">
-                    <div class="progress-fill" style="width: <?php echo esc_attr($level['progress_percent']); ?>%;"></div>
+                    <div class="progress-fill" style="width: <?php echo esc_attr($level['progress_percent'] ?: 0); ?>%;"></div>
                 </div>
             </div>
 
@@ -46,7 +48,7 @@ class MKWADashboard {
                 <?php if (!empty($badges)) : ?>
                     <ul>
                         <?php foreach ($badges as $badge) : ?>
-                            <li><?php echo esc_html($badge['name']); ?> - <?php echo esc_html($badge['description']); ?></li>
+                            <li><?php echo esc_html($badge['name'] ?: 'Unnamed Badge'); ?> - <?php echo esc_html($badge['description'] ?: 'No description.'); ?></li>
                         <?php endforeach; ?>
                     </ul>
                 <?php else : ?>
@@ -59,7 +61,7 @@ class MKWADashboard {
                 <?php if (!empty($quests)) : ?>
                     <ul>
                         <?php foreach ($quests as $quest) : ?>
-                            <li><?php echo esc_html($quest['name']); ?> - <?php echo $quest['completed'] ? 'Completed' : 'Incomplete'; ?></li>
+                            <li><?php echo esc_html($quest->quest_name ?: 'Unknown Quest'); ?> - <?php echo $quest->completed ? 'Completed' : 'Incomplete'; ?></li>
                         <?php endforeach; ?>
                     </ul>
                 <?php else : ?>
@@ -70,15 +72,19 @@ class MKWADashboard {
             <div class="history-section">
                 <h3>Activity History</h3>
                 <ul>
-                    <?php foreach ($history as $event) : ?>
-                        <li><?php echo esc_html($event['date']); ?> - <?php echo esc_html($event['description']); ?></li>
-                    <?php endforeach; ?>
+                    <?php if (!empty($history)) : ?>
+                        <?php foreach ($history as $event) : ?>
+                            <li><?php echo esc_html($event['date'] ?: 'N/A'); ?> - <?php echo esc_html($event['description'] ?: 'No description.'); ?></li>
+                        <?php endforeach; ?>
+                    <?php else : ?>
+                        <p>No activity history yet.</p>
+                    <?php endif; ?>
                 </ul>
             </div>
 
             <div class="overall-score-section">
                 <h3>Overall Member Score</h3>
-                <p>Your Overall Score: <?php echo esc_html(self::calculate_overall_score($user_id)); ?></p>
+                <p>Your Overall Score: <?php echo esc_html(self::calculate_overall_score($user_id) ?: 0); ?></p>
             </div>
 
             <div class="profile-edit-section">
@@ -97,6 +103,9 @@ class MKWADashboard {
         return ob_get_clean();
     }
 
+    /**
+     * Handle AJAX profile update.
+     */
     public static function update_profile() {
         check_ajax_referer('mkwa_update_profile_nonce', 'mkwa_profile_nonce');
 
@@ -119,6 +128,9 @@ class MKWADashboard {
         wp_send_json_success('Profile updated successfully.');
     }
 
+    /**
+     * Calculate overall member score.
+     */
     public static function calculate_overall_score($user_id) {
         $weights = [
             'attendance' => 0.3,
@@ -131,9 +143,11 @@ class MKWADashboard {
         $overall_score = 0;
 
         foreach ($weights as $category => $weight) {
-            $overall_score += $metrics[$category] * $weight;
+            $overall_score += ($metrics[$category] ?? 0) * $weight;
         }
 
         return round($overall_score, 2);
     }
 }
+
+MKWADashboard::init();

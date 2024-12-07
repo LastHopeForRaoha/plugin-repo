@@ -12,51 +12,39 @@ class MKWARewardsStore {
         self::$rewards_table = $wpdb->prefix . 'mkwa_rewards';
         self::$rewards_log_table = $wpdb->prefix . 'mkwa_rewards_log';
 
-        // Create tables on activation
+        // Hook to create tables.
         add_action('plugins_loaded', [__CLASS__, 'create_tables']);
-        // AJAX handler for redeeming rewards
+        // AJAX handler for redeeming rewards.
         add_action('wp_ajax_mkwa_redeem_reward', [__CLASS__, 'redeem_reward']);
     }
 
     public static function create_tables() {
-        self::create_rewards_table();
-        self::create_rewards_log_table();
-    }
-
-    private static function create_rewards_table() {
         global $wpdb;
         $charset_collate = $wpdb->get_charset_collate();
 
-        $sql = "CREATE TABLE IF NOT EXISTS " . self::$rewards_table . " (
-            id INT NOT NULL AUTO_INCREMENT,
+        // Create rewards table.
+        $rewards_sql = "CREATE TABLE IF NOT EXISTS " . self::$rewards_table . " (
+            id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             reward_name VARCHAR(255) NOT NULL,
             description TEXT,
             points_required INT NOT NULL,
             stock INT DEFAULT 0,
             category ENUM('low', 'mid', 'high') NOT NULL,
             seasonal TINYINT(1) DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id)
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) $charset_collate;";
+
+        // Create rewards log table.
+        $log_sql = "CREATE TABLE IF NOT EXISTS " . self::$rewards_log_table . " (
+            id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id BIGINT(20) UNSIGNED NOT NULL,
+            reward_id BIGINT(20) UNSIGNED NOT NULL,
+            redeemed_at DATETIME DEFAULT CURRENT_TIMESTAMP
         ) $charset_collate;";
 
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-        dbDelta($sql);
-    }
-
-    private static function create_rewards_log_table() {
-        global $wpdb;
-        $charset_collate = $wpdb->get_charset_collate();
-
-        $sql = "CREATE TABLE IF NOT EXISTS " . self::$rewards_log_table . " (
-            id INT NOT NULL AUTO_INCREMENT,
-            user_id INT NOT NULL,
-            reward_id INT NOT NULL,
-            redeemed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id)
-        ) $charset_collate;";
-
-        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-        dbDelta($sql);
+        dbDelta($rewards_sql);
+        dbDelta($log_sql);
     }
 
     public static function display_rewards_store() {
@@ -73,17 +61,13 @@ class MKWARewardsStore {
         ?>
         <div class="mkwa-rewards-store">
             <h2>Rewards Store</h2>
-            <p>You have <strong><?php echo esc_html($user_points); ?> points</strong> available.</p>
+            <p>You have <strong><?php echo esc_html($user_points); ?> points</strong>.</p>
             <ul>
                 <?php foreach ($rewards as $reward) : ?>
                     <li>
-                        <strong><?php echo esc_html($reward->reward_name); ?></strong> - 
+                        <strong><?php echo esc_html($reward->reward_name); ?></strong> -
                         <?php echo esc_html($reward->points_required); ?> points
-                        <?php if ($reward->stock > 0) : ?>
-                            <button class="redeem-reward" data-reward-id="<?php echo esc_attr($reward->id); ?>">Redeem</button>
-                        <?php else : ?>
-                            <span class="out-of-stock">Out of Stock</span>
-                        <?php endif; ?>
+                        <button class="redeem-reward" data-reward-id="<?php echo esc_attr($reward->id); ?>">Redeem</button>
                     </li>
                 <?php endforeach; ?>
             </ul>
@@ -112,11 +96,11 @@ class MKWARewardsStore {
             wp_send_json_error('You do not have enough points for this reward.');
         }
 
-        // Deduct points and update stock
+        // Deduct points and update stock.
         MKWAPointsSystem::deduct_user_points($user_id, $reward->points_required);
         $wpdb->update(self::$rewards_table, ['stock' => $reward->stock - 1], ['id' => $reward_id], ['%d'], ['%d']);
 
-        // Log the redemption
+        // Log redemption.
         $wpdb->insert(self::$rewards_log_table, [
             'user_id' => $user_id,
             'reward_id' => $reward_id,
@@ -127,4 +111,3 @@ class MKWARewardsStore {
 }
 
 MKWARewardsStore::init();
-?>

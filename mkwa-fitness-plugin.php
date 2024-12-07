@@ -2,7 +2,7 @@
 /**
  * Plugin Name: MKWA Fitness Plugin
  * Description: Gamification features for MKWA Fitness, including points, badges, daily quests, workout buddy finder, leaderboard, dashboard, rewards store, and user registration/profile management.
- * Version: 2.0
+ * Version: 2.1
  * Author: MKWA Fitness
  */
 
@@ -11,40 +11,51 @@ if (!defined('ABSPATH')) {
 }
 
 // Include necessary files for all features
-require_once plugin_dir_path(__FILE__) . 'includes/class-mkwa-points-system.php';
-require_once plugin_dir_path(__FILE__) . 'includes/class-mkwa-badges-system.php';
-require_once plugin_dir_path(__FILE__) . 'includes/class-mkwa-daily-quests.php';
-require_once plugin_dir_path(__FILE__) . 'includes/class-mkwa-buddy-finder.php';
-require_once plugin_dir_path(__FILE__) . 'includes/class-mkwa-leaderboard.php';
-require_once plugin_dir_path(__FILE__) . 'includes/class-mkwa-dashboard.php';
-require_once plugin_dir_path(__FILE__) . 'includes/class-mkwa-rewards-store.php';
-require_once plugin_dir_path(__FILE__) . 'includes/class-mkwa-registration.php';
+$includes = [
+    'class-mkwa-points-system.php',
+    'class-mkwa-badges-system.php',
+    'class-mkwa-daily-quests.php',
+    'class-mkwa-buddy-finder.php',
+    'class-mkwa-leaderboard.php',
+    'class-mkwa-dashboard.php',
+    'class-mkwa-rewards-store.php',
+    'class-mkwa-registration.php',
+];
+
+foreach ($includes as $file) {
+    $path = plugin_dir_path(__FILE__) . 'includes/' . $file;
+    if (file_exists($path)) {
+        require_once $path;
+    } else {
+        error_log("MKWA Fitness Plugin: Missing required file - $file");
+    }
+}
 
 // Initialize all classes
-add_action('plugins_loaded', function() {
-    MKWAPointsSystem::init();
-    MKWABadgesSystem::init();
-    MKWADailyQuests::init();
-    MKWABuddyFinder::init();
-    MKWALeaderboard::init();
-    MKWADashboard::init();
-    MKWARewardsStore::init();
-    MKWARegistration::init();
+add_action('plugins_loaded', function () {
+    if (class_exists('MKWAPointsSystem')) MKWAPointsSystem::init();
+    if (class_exists('MKWABadgesSystem')) MKWABadgesSystem::init();
+    if (class_exists('MKWADailyQuests')) MKWADailyQuests::init();
+    if (class_exists('MKWABuddyFinder')) MKWABuddyFinder::init();
+    if (class_exists('MKWALeaderboard')) MKWALeaderboard::init();
+    if (class_exists('MKWADashboard')) MKWADashboard::init();
+    if (class_exists('MKWARewardsStore')) MKWARewardsStore::init();
+    if (class_exists('MKWARegistration')) MKWARegistration::init();
 });
 
 // Activation hook to create database tables
-register_activation_hook(__FILE__, function() {
-    MKWAPointsSystem::create_table();
-    MKWABadgesSystem::create_table();
-    MKWADailyQuests::create_table();
-    MKWABuddyFinder::create_table();
-    MKWALeaderboard::create_table();
-    MKWARewardsStore::create_table();
-    MKWARegistration::create_table(); // For user profiles
+register_activation_hook(__FILE__, function () {
+    if (class_exists('MKWAPointsSystem')) MKWAPointsSystem::create_table();
+    if (class_exists('MKWABadgesSystem')) MKWABadgesSystem::create_table();
+    if (class_exists('MKWADailyQuests')) MKWADailyQuests::create_table();
+    if (class_exists('MKWABuddyFinder')) MKWABuddyFinder::create_table();
+    if (class_exists('MKWALeaderboard')) MKWALeaderboard::create_table();
+    if (class_exists('MKWARewardsStore')) MKWARewardsStore::create_tables(); // Ensures rewards and log tables are created
+    if (class_exists('MKWARegistration')) MKWARegistration::create_table(); // For user profiles
 });
 
 // Enqueue scripts and styles
-add_action('wp_enqueue_scripts', function() {
+add_action('wp_enqueue_scripts', function () {
     wp_enqueue_style('mkwa-styles', plugin_dir_url(__FILE__) . 'assets/css/mkwa-styles.css');
     wp_enqueue_script('mkwa-scripts', plugin_dir_url(__FILE__) . 'assets/js/mkwa-scripts.js', ['jquery'], null, true);
     wp_localize_script('mkwa-scripts', 'mkwaAjax', [
@@ -53,46 +64,33 @@ add_action('wp_enqueue_scripts', function() {
 });
 
 // Shortcodes for displaying features
-add_shortcode('mkwa_daily_quests', function($atts) {
-    return MKWADailyQuests::display_daily_quests($atts);
-});
+$shortcodes = [
+    'mkwa_daily_quests' => 'MKWADailyQuests::display_daily_quests',
+    'mkwa_buddy_finder' => 'MKWABuddyFinder::display_buddy_finder',
+    'mkwa_leaderboard' => 'MKWALeaderboard::display_leaderboard',
+    'mkwa_dashboard' => 'MKWADashboard::display_dashboard',
+    'mkwa_rewards_store' => 'MKWARewardsStore::display_rewards_store',
+    'mkwa_registration_form' => 'MKWARegistration::display_registration_form',
+    'mkwa_badge_showcase' => function () {
+        $user_id = get_current_user_id();
+        ob_start();
+        MKWADashboard::display_user_badges($user_id);
+        return ob_get_clean();
+    },
+];
 
-add_shortcode('mkwa_buddy_finder', function($atts) {
-    return MKWABuddyFinder::display_buddy_finder($atts);
-});
-
-add_shortcode('mkwa_leaderboard', function($atts) {
-    return MKWALeaderboard::display_leaderboard($atts);
-});
-
-add_shortcode('mkwa_dashboard', function($atts) {
-    return MKWADashboard::display_dashboard($atts);
-});
-
-add_shortcode('mkwa_rewards_store', function($atts) {
-    return MKWARewardsStore::display_rewards_store($atts);
-});
-
-add_shortcode('mkwa_registration_form', function($atts) {
-    return MKWARegistration::display_registration_form($atts);
-});
-
-// Add badge showcase shortcode
-add_shortcode('mkwa_badge_showcase', function($atts) {
-    $user_id = get_current_user_id();
-    ob_start();
-    MKWADashboard::display_user_badges($user_id);
-    return ob_get_clean();
-});
+foreach ($shortcodes as $tag => $callback) {
+    add_shortcode($tag, $callback);
+}
 
 // Admin Menu for Settings
-add_action('admin_menu', function() {
+add_action('admin_menu', function () {
     add_menu_page(
         'MKWA Fitness Plugin',
         'MKWA Fitness',
         'manage_options',
         'mkwa-fitness',
-        function() {
+        function () {
             echo '<h1>MKWA Fitness Plugin Settings</h1>';
             echo '<p>Configure your MKWA Fitness Plugin settings here.</p>';
         }
@@ -104,19 +102,23 @@ add_action('admin_menu', function() {
         'Badges',
         'manage_options',
         'mkwa-badge-management',
-        function() {
+        function () {
             if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['award_badge'])) {
                 $user_id = intval($_POST['user_id']);
                 $badge_slug = sanitize_text_field($_POST['badge_slug']);
-                MKWABadgesSystem::assign_badge(
-                    $user_id,
-                    $badge_slug,
-                    MKWABadgesSystem::get_user_badges($user_id),
-                    0,
-                    "Custom Badge",
-                    "Manually awarded badge"
-                );
-                echo '<p>Badge awarded successfully to User ID ' . esc_html($user_id) . '.</p>';
+                if (class_exists('MKWABadgesSystem')) {
+                    MKWABadgesSystem::assign_badge(
+                        $user_id,
+                        $badge_slug,
+                        MKWABadgesSystem::get_user_badges($user_id),
+                        0,
+                        "Custom Badge",
+                        "Manually awarded badge"
+                    );
+                    echo '<p>Badge awarded successfully to User ID ' . esc_html($user_id) . '.</p>';
+                } else {
+                    echo '<p>Error: Badge system is not available.</p>';
+                }
             }
             ?>
             <h1>Badge Management</h1>

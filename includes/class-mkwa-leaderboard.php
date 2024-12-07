@@ -88,10 +88,8 @@ class MKWALeaderboard {
     public static function get_top_users($limit = 10, $category = 'overall') {
         global $wpdb;
 
-        $query = "SELECT user_id, SUM(points) AS points
-                  FROM " . self::$table_name . "
+        $query = "SELECT user_id, points FROM " . self::$table_name . " 
                   WHERE category = %s
-                  GROUP BY user_id
                   ORDER BY points DESC
                   LIMIT %d";
 
@@ -99,20 +97,20 @@ class MKWALeaderboard {
     }
 
     /**
-     * Update leaderboard data (e.g., for periodic updates).
+     * Update leaderboard data for a specific category.
      */
     public static function update_leaderboard($category = 'overall') {
         global $wpdb;
         $users = get_users(['fields' => ['ID']]);
 
-        foreach ($users as $user_id) {
-            $points = MKWAPointsSystem::get_user_points($user_id);
+        foreach ($users as $user) {
+            $points = MKWAPointsSystem::get_user_points($user->ID);
 
             if ($points > 0) {
                 $wpdb->replace(
                     self::$table_name,
                     [
-                        'user_id' => $user_id,
+                        'user_id' => $user->ID,
                         'points' => $points,
                         'category' => $category,
                     ],
@@ -128,7 +126,6 @@ class MKWALeaderboard {
     public static function reset_monthly_leaderboard() {
         global $wpdb;
 
-        // Reset points for the 'monthly' category
         $wpdb->query($wpdb->prepare(
             "DELETE FROM " . self::$table_name . " WHERE category = %s",
             'monthly'
@@ -149,4 +146,33 @@ class MKWALeaderboard {
         wp_redirect(admin_url('admin.php?page=mkwa-leaderboard'));
         exit;
     }
+
+    /**
+     * Calculate leaderboard ranks for a given category.
+     */
+    public static function calculate_ranks($category = 'overall') {
+        global $wpdb;
+
+        $results = $wpdb->get_results($wpdb->prepare(
+            "SELECT user_id, points 
+             FROM " . self::$table_name . " 
+             WHERE category = %s 
+             ORDER BY points DESC",
+            $category
+        ));
+
+        $rank = 1;
+        foreach ($results as $row) {
+            $wpdb->update(
+                self::$table_name,
+                ['rank' => $rank],
+                ['user_id' => $row->user_id, 'category' => $category],
+                ['%d'],
+                ['%d', '%s']
+            );
+            $rank++;
+        }
+    }
 }
+
+MKWALeaderboard::init();
