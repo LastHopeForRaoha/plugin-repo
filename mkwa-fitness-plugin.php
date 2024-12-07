@@ -30,7 +30,7 @@ add_action('plugins_loaded', function() {
     MKWARewardsStore::init();
 });
 
-// Activation hook for database setup
+// Activation hook to create database tables
 register_activation_hook(__FILE__, function() {
     MKWAPointsSystem::create_table();
     MKWABadgesSystem::create_table();
@@ -70,7 +70,7 @@ add_shortcode('mkwa_rewards_store', function($atts) {
     return MKWARewardsStore::display_rewards_store($atts);
 });
 
-// Custom admin page for plugin settings (if included in the old version)
+// Admin Menu for Settings (if needed)
 add_action('admin_menu', function() {
     add_menu_page(
         'MKWA Fitness Plugin',
@@ -83,6 +83,3 @@ add_action('admin_menu', function() {
         }
     );
 });
-
-// Legacy compatibility code (if applicable from the old version)
-// Retain any additional logic from the old file for backward compatibility

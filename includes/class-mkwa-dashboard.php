@@ -25,7 +25,7 @@ class MKWADashboard {
         ?>
         <div class="mkwa-dashboard">
             <h2>Your Dashboard</h2>
-            <p>Points: <?php echo esc_html($points); ?></p>
+            <p><strong>Total Points:</strong> <?php echo esc_html($points); ?></p>
 
             <h3>Badges</h3>
             <?php if (!empty($badges)) : ?>
