@@ -30,11 +30,12 @@ class MKWALeaderboard {
         $sql = "CREATE TABLE IF NOT EXISTS " . self::$table_name . " (
             id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             user_id BIGINT(20) UNSIGNED NOT NULL,
-            points INT NOT NULL,
+            points INT NOT NULL DEFAULT 0,
             rank INT NOT NULL DEFAULT 0,
             category ENUM('overall', 'monthly', 'weekly') DEFAULT 'overall',
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY user_category (user_id, category)
+            UNIQUE KEY user_category (user_id, category),
+            KEY user_id (user_id)
         ) $charset_collate;";
 
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
@@ -88,7 +89,8 @@ class MKWALeaderboard {
     public static function get_top_users($limit = 10, $category = 'overall') {
         global $wpdb;
 
-        $query = "SELECT user_id, points FROM " . self::$table_name . " 
+        $query = "SELECT user_id, points 
+                  FROM " . self::$table_name . " 
                   WHERE category = %s
                   ORDER BY points DESC
                   LIMIT %d";
@@ -103,14 +105,14 @@ class MKWALeaderboard {
         global $wpdb;
         $users = get_users(['fields' => ['ID']]);
 
-        foreach ($users as $user) {
-            $points = MKWAPointsSystem::get_user_points($user->ID);
+        foreach ($users as $user_id) {
+            $points = MKWAPointsSystem::get_user_points($user_id);
 
             if ($points > 0) {
                 $wpdb->replace(
                     self::$table_name,
                     [
-                        'user_id' => $user->ID,
+                        'user_id' => $user_id,
                         'points' => $points,
                         'category' => $category,
                     ],

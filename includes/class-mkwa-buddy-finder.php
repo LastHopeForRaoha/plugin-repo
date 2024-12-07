@@ -10,7 +10,7 @@ class MKWABuddyFinder {
         global $wpdb;
         self::$table_name = $wpdb->prefix . 'mkwa_buddy_finder';
 
-        // Schedule cleanup for inactive buddy finder entries (optional)
+        // Schedule cleanup for inactive buddy finder entries
         if (!wp_next_scheduled('mkwa_clean_buddy_finder')) {
             wp_schedule_event(time(), 'daily', 'mkwa_clean_buddy_finder');
         }
@@ -18,6 +18,9 @@ class MKWABuddyFinder {
         add_action('mkwa_clean_buddy_finder', [__CLASS__, 'cleanup_inactive_entries']);
     }
 
+    /**
+     * Create the buddy finder table.
+     */
     public static function create_table() {
         global $wpdb;
         $charset_collate = $wpdb->get_charset_collate();
@@ -28,13 +31,17 @@ class MKWABuddyFinder {
             availability TEXT NOT NULL,
             fitness_goals TEXT NOT NULL,
             opt_in TINYINT(1) DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY user_id (user_id)
         ) $charset_collate;";
 
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql);
     }
 
+    /**
+     * Update user preferences for buddy finder.
+     */
     public static function update_preferences($user_id, $availability, $fitness_goals, $opt_in) {
         global $wpdb;
 
@@ -43,10 +50,12 @@ class MKWABuddyFinder {
             'fitness_goals' => maybe_serialize($fitness_goals),
             'opt_in' => $opt_in ? 1 : 0,
         ];
+
         $existing = $wpdb->get_var($wpdb->prepare(
             "SELECT id FROM " . self::$table_name . " WHERE user_id = %d",
             $user_id
         ));
+
         if ($existing) {
             $wpdb->update(
                 self::$table_name,
@@ -68,21 +77,31 @@ class MKWABuddyFinder {
         MKWAPointsSystem::add_points($user_id, 10, 'Updated Buddy Finder Preferences');
     }
 
+    /**
+     * Get user preferences.
+     */
     public static function get_user_preferences($user_id) {
         global $wpdb;
+
         $result = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM " . self::$table_name . " WHERE user_id = %d",
             $user_id
         ));
+
         if ($result) {
             $result->availability = maybe_unserialize($result->availability);
             $result->fitness_goals = maybe_unserialize($result->fitness_goals);
         }
+
         return $result;
     }
 
+    /**
+     * Find buddies for the user.
+     */
     public static function find_buddies($user_id) {
         global $wpdb;
+
         $user_prefs = self::get_user_preferences($user_id);
         if (!$user_prefs || !$user_prefs->opt_in) {
             return [];
@@ -112,6 +131,9 @@ class MKWABuddyFinder {
         return $buddies;
     }
 
+    /**
+     * Check common availability.
+     */
     private static function has_common_availability($avail1, $avail2) {
         if (is_array($avail1) && is_array($avail2)) {
             return !empty(array_intersect($avail1, $avail2));
@@ -119,6 +141,9 @@ class MKWABuddyFinder {
         return false;
     }
 
+    /**
+     * Check common fitness goals.
+     */
     private static function has_common_goals($goals1, $goals2) {
         if (is_array($goals1) && is_array($goals2)) {
             return !empty(array_intersect($goals1, $goals2));
@@ -126,8 +151,12 @@ class MKWABuddyFinder {
         return false;
     }
 
+    /**
+     * Cleanup inactive entries.
+     */
     public static function cleanup_inactive_entries() {
         global $wpdb;
+
         $wpdb->query($wpdb->prepare(
             "DELETE FROM " . self::$table_name . " WHERE opt_in = 0 AND created_at < %s",
             date('Y-m-d H:i:s', strtotime('-30 days'))
@@ -135,4 +164,5 @@ class MKWABuddyFinder {
     }
 }
 
+// Initialize the class
 MKWABuddyFinder::init();

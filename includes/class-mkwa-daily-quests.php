@@ -14,15 +14,20 @@ class MKWADailyQuests {
         add_action('admin_menu', [__CLASS__, 'add_admin_menu']);
         // Add daily quests for all users via cron
         add_action('mkwa_assign_daily_quests', [__CLASS__, 'assign_daily_quests_to_all']);
+
         // Schedule daily cron if not already scheduled
         if (!wp_next_scheduled('mkwa_assign_daily_quests')) {
             wp_schedule_event(time(), 'daily', 'mkwa_assign_daily_quests');
         }
     }
 
+    /**
+     * Create the daily quests table.
+     */
     public static function create_table() {
         global $wpdb;
         $charset_collate = $wpdb->get_charset_collate();
+
         $sql = "CREATE TABLE IF NOT EXISTS " . self::$table_name . " (
             id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             user_id BIGINT(20) UNSIGNED NOT NULL,
@@ -32,12 +37,17 @@ class MKWADailyQuests {
             goal INT DEFAULT 1,
             completed TINYINT(1) DEFAULT 0,
             date_assigned DATE NOT NULL,
-            UNIQUE KEY user_quest_date (user_id, quest_name, date_assigned)
+            UNIQUE KEY user_quest_date (user_id, quest_name, date_assigned),
+            KEY user_id (user_id)
         ) $charset_collate;";
+
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql);
     }
 
+    /**
+     * Add admin menu for quest management.
+     */
     public static function add_admin_menu() {
         add_submenu_page(
             'mkwa-fitness',
@@ -49,6 +59,9 @@ class MKWADailyQuests {
         );
     }
 
+    /**
+     * Render the admin page for managing daily quests.
+     */
     public static function render_admin_page() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_quest'])) {
             $name = sanitize_text_field($_POST['quest_name']);
@@ -61,7 +74,7 @@ class MKWADailyQuests {
                 'name' => $name,
                 'points' => $points,
                 'goal' => $goal,
-                'type' => $type
+                'type' => $type,
             ];
             update_option('mkwa_default_daily_quests', $quests);
             echo '<p>Quest added successfully!</p>';
@@ -77,14 +90,14 @@ class MKWADailyQuests {
             <label for="quest_points">Points:</label>
             <input type="number" id="quest_points" name="quest_points" required>
             <br>
-            <label for="quest_goal">Goal (e.g., 3 sets):</label>
+            <label for="quest_goal">Goal:</label>
             <input type="number" id="quest_goal" name="quest_goal" required>
             <br>
             <label for="quest_type">Type:</label>
             <select id="quest_type" name="quest_type">
                 <option value="individual">Individual</option>
-                <option value="themed">Themed</option>
                 <option value="group">Group</option>
+                <option value="themed">Themed</option>
             </select>
             <br><br>
             <button type="submit" name="add_quest">Add Quest</button>
@@ -100,6 +113,9 @@ class MKWADailyQuests {
         <?php
     }
 
+    /**
+     * Get default daily quests.
+     */
     public static function get_default_quests() {
         return get_option('mkwa_default_daily_quests', [
             ['name' => 'Early Bird', 'points' => 5, 'goal' => 1, 'type' => 'individual'],
@@ -108,13 +124,22 @@ class MKWADailyQuests {
         ]);
     }
 
+    /**
+     * Assign daily quests to all users.
+     */
     public static function assign_daily_quests_to_all() {
         $users = get_users(['fields' => ['ID']]);
-        foreach ($users as $user) {
-            self::assign_daily_quests($user->ID);
+        $batch_size = 100; // Process users in batches to prevent timeouts
+        foreach (array_chunk($users, $batch_size) as $user_batch) {
+            foreach ($user_batch as $user) {
+                self::assign_daily_quests($user->ID);
+            }
         }
     }
 
+    /**
+     * Assign daily quests to a specific user.
+     */
     public static function assign_daily_quests($user_id) {
         global $wpdb;
         $quests = self::get_default_quests();
@@ -128,11 +153,14 @@ class MKWADailyQuests {
                 'progress' => 0,
                 'goal' => $quest['goal'],
                 'completed' => 0,
-                'date_assigned' => $date
-            ], ['%d', '%s', '%d', '%d', '%d', '%d', '%s']);
+                'date_assigned' => $date,
+            ], ['%d', '%s', '%d', '%d', '%d', '%s']);
         }
     }
 
+    /**
+     * Get quests for a user for the current day.
+     */
     public static function get_user_quests($user_id) {
         global $wpdb;
         $date = current_time('Y-m-d');
@@ -142,6 +170,9 @@ class MKWADailyQuests {
         ));
     }
 
+    /**
+     * Update quest progress.
+     */
     public static function update_quest_progress($quest_id, $user_id, $increment = 1) {
         global $wpdb;
 
@@ -168,4 +199,5 @@ class MKWADailyQuests {
         }
     }
 }
+
 MKWADailyQuests::init();

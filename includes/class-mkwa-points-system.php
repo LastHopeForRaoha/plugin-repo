@@ -14,24 +14,32 @@ class MKWAPointsSystem {
         add_action('mkwa_reset_streaks_daily', [__CLASS__, 'reset_daily_streaks']);
     }
 
+    /**
+     * Create the points table.
+     */
     public static function create_table() {
         global $wpdb;
+        self::init(); // Ensure table name is initialized
         $charset_collate = $wpdb->get_charset_collate();
 
-        $sql = "CREATE TABLE " . self::$table_name . " (
-            id BIGINT(20) UNSIGNED AUTO_INCREMENT,
+        $sql = "CREATE TABLE IF NOT EXISTS " . self::$table_name . " (
+            id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             user_id BIGINT(20) UNSIGNED NOT NULL,
             points INT NOT NULL,
             description TEXT NOT NULL,
             date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             streak_days INT DEFAULT 0,
             last_activity_date DATE,
-            PRIMARY KEY (id),
             UNIQUE KEY user_last_activity (user_id, last_activity_date)
         ) $charset_collate;";
 
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql);
+
+        // Optional: Log or handle dbDelta errors
+        if ($wpdb->last_error) {
+            error_log('MKWAPointsSystem: Failed to create table. Error: ' . $wpdb->last_error);
+        }
     }
 
     /**
@@ -40,11 +48,19 @@ class MKWAPointsSystem {
     public static function add_points($user_id, $points, $description = '') {
         global $wpdb;
 
-        $wpdb->insert(self::$table_name, [
-            'user_id' => $user_id,
-            'points' => $points,
-            'description' => $description,
-        ], ['%d', '%d', '%s']);
+        $result = $wpdb->insert(
+            self::$table_name,
+            [
+                'user_id' => $user_id,
+                'points' => $points,
+                'description' => $description,
+            ],
+            ['%d', '%d', '%s']
+        );
+
+        if ($result === false) {
+            error_log('MKWAPointsSystem: Failed to add points. Error: ' . $wpdb->last_error);
+        }
 
         // Update total points in user meta
         $total_points = self::get_user_points($user_id);
@@ -55,15 +71,7 @@ class MKWAPointsSystem {
      * Deduct points for a user.
      */
     public static function deduct_user_points($user_id, $points) {
-        global $wpdb;
-        $wpdb->insert(self::$table_name, [
-            'user_id' => $user_id,
-            'points' => -abs($points),
-            'description' => 'Points deduction',
-        ], ['%d', '%d', '%s']);
-
-        $total_points = self::get_user_points($user_id);
-        update_user_meta($user_id, 'mkwa_total_points', $total_points);
+        self::add_points($user_id, -abs($points), 'Points deduction');
     }
 
     /**
@@ -76,7 +84,7 @@ class MKWAPointsSystem {
             $user_id
         ));
 
-        return $points ? $points : 0;
+        return $points ?: 0; // Return 0 if null
     }
 
     /**
@@ -107,7 +115,6 @@ class MKWAPointsSystem {
 
         $streak_days = 1;
         if ($last_activity && date('Y-m-d', strtotime($last_activity . ' +1 day')) === $today) {
-            // Continue streak
             $streak_days = $wpdb->get_var($wpdb->prepare(
                 "SELECT streak_days FROM " . self::$table_name . " WHERE user_id = %d ORDER BY last_activity_date DESC LIMIT 1",
                 $user_id
@@ -122,7 +129,6 @@ class MKWAPointsSystem {
             'last_activity_date' => $today,
         ], ['%d', '%d', '%s', '%d', '%s']);
 
-        // Update user meta for streak
         update_user_meta($user_id, 'mkwa_streak_days', $streak_days);
     }
 
@@ -137,6 +143,10 @@ class MKWAPointsSystem {
             "UPDATE " . self::$table_name . " SET streak_days = 0 WHERE last_activity_date < %s",
             $yesterday
         ));
+
+        if ($wpdb->last_error) {
+            error_log('MKWAPointsSystem: Failed to reset streaks. Error: ' . $wpdb->last_error);
+        }
     }
 
     /**
