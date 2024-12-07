@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: MKWA Fitness Plugin
- * Description: Gamification features for MKWA Fitness, including points, badges, and daily quests.
- * Version: 1.0
+ * Description: Gamification features for MKWA Fitness, including points, badges, daily quests, workout buddy finder, leaderboard, dashboard, and rewards store.
+ * Version: 1.4
  * Author: MKWA Fitness
  */
 
@@ -10,26 +10,37 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Include necessary files for new and existing features
-require_once plugin_dir_path(__FILE__) . 'includes/class-mkwa-points-system.php'; // Existing points system
-require_once plugin_dir_path(__FILE__) . 'includes/class-mkwa-badges-system.php'; // Existing badges system
-require_once plugin_dir_path(__FILE__) . 'includes/class-mkwa-daily-quests.php'; // New daily quests system
+// Include necessary files for all features
+require_once plugin_dir_path(__FILE__) . 'includes/class-mkwa-points-system.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-mkwa-badges-system.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-mkwa-daily-quests.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-mkwa-buddy-finder.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-mkwa-leaderboard.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-mkwa-dashboard.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-mkwa-rewards-store.php';
 
-// Initialize classes for existing and new features
+// Initialize all classes
 add_action('plugins_loaded', function() {
-    MKWAPointsSystem::init(); // Existing points system
-    MKWABadgesSystem::init(); // Existing badges system
-    MKWADailyQuests::init();  // New daily quests system
+    MKWAPointsSystem::init();
+    MKWABadgesSystem::init();
+    MKWADailyQuests::init();
+    MKWABuddyFinder::init();
+    MKWALeaderboard::init();
+    MKWADashboard::init();
+    MKWARewardsStore::init();
 });
 
-// Activation hook for setting up required database tables
+// Activation hook for database setup
 register_activation_hook(__FILE__, function() {
-    MKWAPointsSystem::create_table(); // Ensure existing points table is created
-    MKWABadgesSystem::create_table(); // Ensure existing badges table is created
-    MKWADailyQuests::create_table();  // New: Daily quests table
+    MKWAPointsSystem::create_table();
+    MKWABadgesSystem::create_table();
+    MKWADailyQuests::create_table();
+    MKWABuddyFinder::create_table();
+    MKWALeaderboard::create_table(); // Ensure leaderboard table creation if required
+    MKWARewardsStore::create_table(); // Rewards Store table
 });
 
-// Enqueue scripts and styles for frontend
+// Enqueue scripts and styles
 add_action('wp_enqueue_scripts', function() {
     wp_enqueue_style('mkwa-styles', plugin_dir_url(__FILE__) . 'assets/css/mkwa-styles.css');
     wp_enqueue_script('mkwa-scripts', plugin_dir_url(__FILE__) . 'assets/js/mkwa-scripts.js', ['jquery'], null, true);
@@ -38,41 +49,40 @@ add_action('wp_enqueue_scripts', function() {
     ]);
 });
 
-// Shortcodes for frontend displays
-add_shortcode('mkwa_daily_quests', function() {
-    if (!is_user_logged_in()) {
-        return '<p>Please log in to view your daily quests.</p>';
-    }
-    $user_id = get_current_user_id();
-    $quests = MKWADailyQuests::get_user_quests($user_id);
-    ob_start();
-    echo '<ul class="mkwa-daily-quests">';
-    foreach ($quests as $quest) {
-        echo '<li data-quest-id="' . esc_attr($quest->id) . '">';
-        echo esc_html($quest->quest_name) . ' - ' . esc_html($quest->points) . ' points';
-        if ($quest->completed) {
-            echo ' <span class="completed">Completed</span>';
-        } else {
-            echo ' <button class="complete-quest">Mark as Completed</button>';
-        }
-        echo '</li>';
-    }
-    echo '</ul>';
-    return ob_get_clean();
+// Shortcodes for displaying features
+add_shortcode('mkwa_daily_quests', function($atts) {
+    return MKWADailyQuests::display_daily_quests($atts);
 });
 
-// AJAX handler for completing quests
-add_action('wp_ajax_mkwa_complete_quest', function() {
-    if (!is_user_logged_in()) {
-        wp_send_json_error('You must be logged in to complete quests.');
-    }
-    $quest_id = isset($_POST['quest_id']) ? intval($_POST['quest_id']) : 0;
-    if ($quest_id > 0) {
-        $user_id = get_current_user_id();
-        MKWADailyQuests::mark_quest_completed($quest_id, $user_id);
-        wp_send_json_success('Quest marked as completed.');
-    } else {
-        wp_send_json_error('Invalid quest ID.');
-    }
+add_shortcode('mkwa_buddy_finder', function($atts) {
+    return MKWABuddyFinder::display_buddy_finder($atts);
 });
-?>
+
+add_shortcode('mkwa_leaderboard', function($atts) {
+    return MKWALeaderboard::display_leaderboard($atts);
+});
+
+add_shortcode('mkwa_dashboard', function($atts) {
+    return MKWADashboard::display_dashboard($atts);
+});
+
+add_shortcode('mkwa_rewards_store', function($atts) {
+    return MKWARewardsStore::display_rewards_store($atts);
+});
+
+// Custom admin page for plugin settings (if included in the old version)
+add_action('admin_menu', function() {
+    add_menu_page(
+        'MKWA Fitness Plugin',
+        'MKWA Fitness',
+        'manage_options',
+        'mkwa-fitness',
+        function() {
+            echo '<h1>MKWA Fitness Plugin Settings</h1>';
+            echo '<p>Configure your MKWA Fitness Plugin settings here.</p>';
+        }
+    );
+});
+
+// Legacy compatibility code (if applicable from the old version)
+// Retain any additional logic from the old file for backward compatibility
