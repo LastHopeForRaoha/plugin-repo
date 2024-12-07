@@ -25,6 +25,7 @@ $includes = [
     'class-mkwa-dashboard.php',
     'class-mkwa-rewards-store.php',
     'class-mkwa-registration.php',
+    'class-mkwa-activity-history.php',
     'helpers.php', // Common utility functions like mkwa_get_profile_data
 ];
 
@@ -48,6 +49,7 @@ add_action('plugins_loaded', function () {
         'MKWADashboard',
         'MKWARewardsStore',
         'MKWARegistration',
+        'MKWAActivityHistory'
     ];
 
     foreach ($classes as $class) {

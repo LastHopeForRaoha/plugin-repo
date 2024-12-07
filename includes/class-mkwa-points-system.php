@@ -53,6 +53,87 @@ class MKWAPointsSystem {
     }
 
     /**
+     * Calculate the ultimate score for a user.
+     */
+    public static function calculate_ultimate_score($user_id) {
+        // Fetch metrics
+        $attendance = self::get_attendance_score($user_id);
+        $class_participation = self::get_class_participation_score($user_id);
+        $streaks = self::get_streak_score($user_id);
+        $points = self::get_user_points($user_id);
+        $badges = MKWABadgesSystem::get_user_badge_count($user_id);
+        $membership_duration = self::get_membership_duration_score($user_id);
+
+        // Weighted Model
+        $weighted_model = (
+            0.2 * $attendance +
+            0.15 * $class_participation +
+            0.15 * $streaks +
+            0.1 * $points +
+            0.1 * $badges +
+            0.3 * $membership_duration
+        );
+
+        // Statistical Adjustment (Placeholder)
+        $statistical_adjustment = self::calculate_statistical_adjustment($user_id);
+
+        // AI Predicted Impact (Placeholder)
+        $ai_predicted_impact = self::calculate_ai_impact($user_id);
+
+        // Combine all components
+        $ultimate_score = 0.5 * $weighted_model + 0.3 * $statistical_adjustment + 0.2 * $ai_predicted_impact;
+
+        return round($ultimate_score, 2); // Rounded for cleaner display
+    }
+
+    /**
+     * Get attendance score for a user.
+     */
+    private static function get_attendance_score($user_id) {
+        $attendance = get_user_meta($user_id, 'attendance_last_30_days', true) ?: 0;
+        return min($attendance / 30, 1); // Normalized to 1
+    }
+
+    /**
+     * Get class participation score for a user.
+     */
+    private static function get_class_participation_score($user_id) {
+        $classes = get_user_meta($user_id, 'classes_attended_last_30_days', true) ?: 0;
+        return min($classes / 10, 1); // Normalized to 1
+    }
+
+    /**
+     * Get streak score for a user.
+     */
+    private static function get_streak_score($user_id) {
+        $streak_days = get_user_meta($user_id, 'mkwa_streak_days', true) ?: 0;
+        return min($streak_days / 30, 1); // Normalized to 1
+    }
+
+    /**
+     * Get membership duration score.
+     */
+    private static function get_membership_duration_score($user_id) {
+        $start_date = get_user_meta($user_id, 'membership_start_date', true);
+        $days = (time() - strtotime($start_date)) / (60 * 60 * 24);
+        return min($days / 365, 1); // Normalized to 1 (1 year = max score)
+    }
+
+    /**
+     * Placeholder for statistical adjustment.
+     */
+    private static function calculate_statistical_adjustment($user_id) {
+        return 0.8; // Static placeholder; integrate PCA or clustering here
+    }
+
+    /**
+     * Placeholder for AI impact calculation.
+     */
+    private static function calculate_ai_impact($user_id) {
+        return 0.9; // Static placeholder; integrate AI model here
+    }
+
+    /**
      * Add points for a user with an optional description.
      */
     public static function add_points($user_id, $points, $description = '') {
@@ -98,89 +179,6 @@ class MKWAPointsSystem {
         ));
 
         return $points ?: 0; // Return 0 if null
-    }
-
-    /**
-     * Get a user's points log.
-     */
-    public static function get_user_points_log($user_id) {
-        global $wpdb;
-        self::ensure_table_exists();
-
-        return $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM " . self::$table_name . " WHERE user_id = %d ORDER BY date DESC",
-            $user_id
-        ));
-    }
-
-    /**
-     * Track daily streaks.
-     */
-    public static function update_daily_streak($user_id) {
-        global $wpdb;
-        self::ensure_table_exists();
-
-        $last_activity = $wpdb->get_var($wpdb->prepare(
-            "SELECT last_activity_date FROM " . self::$table_name . " WHERE user_id = %d ORDER BY last_activity_date DESC LIMIT 1",
-            $user_id
-        ));
-
-        $today = current_time('Y-m-d');
-        if ($last_activity === $today) {
-            return; // Already updated today
-        }
-
-        $streak_days = 1;
-        if ($last_activity && date('Y-m-d', strtotime($last_activity . ' +1 day')) === $today) {
-            $streak_days = $wpdb->get_var($wpdb->prepare(
-                "SELECT streak_days FROM " . self::$table_name . " WHERE user_id = %d ORDER BY last_activity_date DESC LIMIT 1",
-                $user_id
-            )) + 1;
-        }
-
-        $wpdb->insert(self::$table_name, [
-            'user_id' => $user_id,
-            'points' => 5, // Reward for maintaining streak
-            'description' => 'Daily streak bonus',
-            'streak_days' => $streak_days,
-            'last_activity_date' => $today,
-        ], ['%d', '%d', '%s', '%d', '%s']);
-
-        update_user_meta($user_id, 'mkwa_streak_days', $streak_days);
-    }
-
-    /**
-     * Reset daily streaks for inactive users.
-     */
-    public static function reset_daily_streaks() {
-        global $wpdb;
-        self::ensure_table_exists();
-
-        $yesterday = date('Y-m-d', strtotime('-1 day'));
-
-        $wpdb->query($wpdb->prepare(
-            "UPDATE " . self::$table_name . " SET streak_days = 0 WHERE last_activity_date < %s",
-            $yesterday
-        ));
-
-        if ($wpdb->last_error) {
-            error_log('MKWAPointsSystem: Failed to reset streaks. Error: ' . $wpdb->last_error);
-        }
-    }
-
-    /**
-     * Award bonus points for group class attendance.
-     */
-    public static function award_group_class_bonus($user_id, $class_id) {
-        self::add_points($user_id, 10, 'Group class bonus for class ID: ' . $class_id);
-    }
-
-    /**
-     * Award points for referrals.
-     */
-    public static function award_referral_bonus($referrer_id, $referred_id) {
-        self::add_points($referrer_id, 50, 'Referral bonus for referring user ID: ' . $referred_id);
-        self::add_points($referred_id, 25, 'Welcome bonus for joining via referral');
     }
 }
 

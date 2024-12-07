@@ -32,16 +32,26 @@ class MKWADashboard {
         $badges = MKWABadgesSystem::get_user_badges($user_id);
         $quests = MKWADailyQuests::get_user_quests($user_id);
         $history = MKWAActivityHistory::get_user_history($user_id);
+        $ultimate_score = self::calculate_ultimate_score($user_id); // New feature
 
         ob_start();
         ?>
         <div class="mkwa-dashboard">
-            <h2>Welcome, <?php echo esc_html($profile['display_name'] ?: 'Member'); ?></h2>
-            <img src="<?php echo esc_url(get_user_meta($user_id, 'profile_picture', true) ?: plugin_dir_url(__FILE__) . 'assets/default-avatar.png'); ?>" alt="Profile Picture" class="profile-picture">
-            <p><strong>Bio:</strong> <?php echo esc_html($profile['bio'] ?: 'No bio provided.'); ?></p>
+            <!-- Profile Section -->
+            <div class="dashboard-profile">
+                <img src="<?php echo esc_url(get_user_meta($user_id, 'profile_picture', true) ?: plugin_dir_url(__FILE__) . 'assets/default-avatar.png'); ?>" alt="Profile Picture" class="profile-picture">
+                <h2><?php echo esc_html($profile['display_name'] ?: 'Member'); ?></h2>
+                <p><strong>Bio:</strong> <?php echo esc_html($profile['bio'] ?: 'No bio provided.'); ?></p>
+                <form id="mkwa-profile-form" method="POST" enctype="multipart/form-data">
+                    <input type="file" id="profile-picture" name="profile_picture">
+                    <textarea id="mkwa-bio" name="mkwa_bio"><?php echo esc_textarea($profile['bio']); ?></textarea>
+                    <?php wp_nonce_field('mkwa_update_profile_nonce', 'mkwa_profile_nonce'); ?>
+                    <button type="submit">Update Profile</button>
+                </form>
+            </div>
 
             <!-- Progress Section -->
-            <div class="progress-section">
+            <div class="dashboard-progress">
                 <h3>Your Progress</h3>
                 <p><strong>Total Points:</strong> <?php echo esc_html($profile['points']); ?></p>
                 <p><strong>Current Level:</strong> <?php echo esc_html($level['title']); ?></p>
@@ -51,36 +61,51 @@ class MKWADashboard {
                 </div>
             </div>
 
+            <!-- Ultimate Score -->
+            <div class="dashboard-ultimate-score">
+                <h3>Your Ultimate Score</h3>
+                <p><?php echo esc_html($ultimate_score); ?></p>
+            </div>
+
             <!-- Badges Section -->
-            <div class="badges-section">
+            <div class="dashboard-badges">
                 <h3>Your Badges</h3>
                 <?php if (!empty($badges)) : ?>
-                    <ul>
+                    <div class="badge-grid">
                         <?php foreach ($badges as $badge) : ?>
-                            <li><?php echo esc_html($badge['name']); ?> - <?php echo esc_html($badge['description']); ?></li>
+                            <div class="badge-item">
+                                <img src="<?php echo esc_url($badge['icon_url']); ?>" alt="<?php echo esc_attr($badge['name']); ?>">
+                                <span class="badge-tooltip"><?php echo esc_html($badge['name']); ?></span>
+                            </div>
                         <?php endforeach; ?>
-                    </ul>
+                    </div>
                 <?php else : ?>
                     <p>No badges earned yet. Start completing activities to earn some!</p>
                 <?php endif; ?>
             </div>
 
-            <!-- Quests Section -->
-            <div class="quests-section">
+            <!-- Daily Quests Section -->
+            <div class="dashboard-quests">
                 <h3>Daily Quests</h3>
                 <?php if (!empty($quests)) : ?>
-                    <ul>
+                    <div class="quest-list">
                         <?php foreach ($quests as $quest) : ?>
-                            <li><?php echo esc_html($quest->quest_name); ?> - <?php echo $quest->completed ? 'Completed' : 'Incomplete'; ?></li>
+                            <div class="quest-card">
+                                <h4><?php echo esc_html($quest->quest_name); ?></h4>
+                                <p><?php echo esc_html($quest->progress . '/' . $quest->goal); ?> completed</p>
+                                <div class="quest-progress-bar">
+                                    <div class="quest-progress-fill" style="width: <?php echo ($quest->progress / $quest->goal) * 100; ?>%;"></div>
+                                </div>
+                            </div>
                         <?php endforeach; ?>
-                    </ul>
+                    </div>
                 <?php else : ?>
                     <p>No quests available today. Check back tomorrow!</p>
                 <?php endif; ?>
             </div>
 
             <!-- Activity History Section -->
-            <div class="history-section">
+            <div class="dashboard-history">
                 <h3>Activity History</h3>
                 <ul>
                     <?php if (!empty($history)) : ?>
@@ -91,19 +116,6 @@ class MKWADashboard {
                         <p>No activity history yet.</p>
                     <?php endif; ?>
                 </ul>
-            </div>
-
-            <!-- Profile Edit Section -->
-            <div class="profile-edit-section">
-                <h3>Edit Profile</h3>
-                <form id="mkwa-profile-form" method="POST" enctype="multipart/form-data">
-                    <label for="profile-picture">Upload Profile Picture:</label>
-                    <input type="file" id="profile-picture" name="profile_picture">
-                    <label for="mkwa-bio">Update Bio:</label>
-                    <textarea id="mkwa-bio" name="mkwa_bio"><?php echo esc_textarea($profile['bio']); ?></textarea>
-                    <?php wp_nonce_field('mkwa_update_profile_nonce', 'mkwa_profile_nonce'); ?>
-                    <button type="submit">Update Profile</button>
-                </form>
             </div>
         </div>
         <?php
@@ -166,6 +178,17 @@ class MKWADashboard {
             'points_to_next' => $next['points'] - $points ?? 0,
             'progress_percent' => $progress,
         ];
+    }
+
+    /**
+     * Calculate the user's Ultimate Score.
+     */
+    private static function calculate_ultimate_score($user_id) {
+        $points = MKWAPointsSystem::get_user_points($user_id);
+        $badges = count(MKWABadgesSystem::get_user_badges($user_id));
+        $days_as_member = (time() - strtotime(get_userdata($user_id)->user_registered)) / 86400;
+
+        return round($points + ($badges * 100) + ($days_as_member * 10));
     }
 }
 
