@@ -126,5 +126,5 @@ class MKWARewardsStore {
     }
 }
 
-MKWARwardsStore::init();
+MKWARewardsStore::init();
 ?>

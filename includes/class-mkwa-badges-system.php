@@ -1,15 +1,39 @@
-
 <?php
 if (!defined('ABSPATH')) {
     exit;
 }
 
 class MKWABadgesSystem {
+    private static $table_name;
+
     public static function init() {
+        global $wpdb;
+        self::$table_name = $wpdb->prefix . 'mkwa_badges';
+
         // Hook into points system activity to check badge eligibility.
         add_action('mkwa_points_activity', [__CLASS__, 'check_badge_awards'], 10, 2);
+
         // Add admin menu for badge management.
         add_action('admin_menu', [__CLASS__, 'add_admin_menu']);
+    }
+
+    /**
+     * Create the badges table.
+     */
+    public static function create_table() {
+        global $wpdb;
+        $charset_collate = $wpdb->get_charset_collate();
+
+        $sql = "CREATE TABLE IF NOT EXISTS " . self::$table_name . " (
+            id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id BIGINT(20) UNSIGNED NOT NULL,
+            badge_slug VARCHAR(255) NOT NULL,
+            awarded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY user_badge (user_id, badge_slug)
+        ) $charset_collate;";
+
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        dbDelta($sql);
     }
 
     /**
@@ -37,13 +61,13 @@ class MKWABadgesSystem {
         if ($activity === 'seasonal_challenge') {
             self::assign_badge($user_id, 'seasonal_champion', $badges, 300, "Seasonal Champion", "Completed a seasonal challenge");
         }
-        
+
         // Additional badge logic for class attendance, leaderboard ranks, and lifetime points.
         if ($activity === 'class_attendance' && self::get_class_count($user_id) >= 50) {
             self::assign_badge($user_id, 'class_master', $badges, 150, "Class Master", "Attended 50 classes");
         }
 
-        if ($activity === 'lifetime_points' && self::get_user_points($user_id) >= 5000) {
+        if ($activity === 'lifetime_points' && MKWAPointsSystem::get_user_points($user_id) >= 5000) {
             self::assign_badge($user_id, 'point_legend', $badges, 500, "Point Legend", "Earned 5000 lifetime points");
         }
     }
@@ -56,9 +80,12 @@ class MKWABadgesSystem {
             return;
         }
 
-        // Add badge to user's badge list.
-        $current_badges[] = $badge_slug;
-        update_user_meta($user_id, 'mkwa_badges', $current_badges);
+        // Add badge to the database table.
+        global $wpdb;
+        $wpdb->insert(self::$table_name, [
+            'user_id' => $user_id,
+            'badge_slug' => $badge_slug,
+        ], ['%d', '%s']);
 
         // Add bonus points for earning the badge.
         MKWAPointsSystem::add_points($user_id, $bonus_points, "Awarded badge: {$badge_name}");
@@ -71,7 +98,12 @@ class MKWABadgesSystem {
      * Get user badges.
      */
     public static function get_user_badges($user_id) {
-        return get_user_meta($user_id, 'mkwa_badges', true) ?: [];
+        global $wpdb;
+        $results = $wpdb->get_results($wpdb->prepare(
+            "SELECT badge_slug FROM " . self::$table_name . " WHERE user_id = %d",
+            $user_id
+        ));
+        return wp_list_pluck($results, 'badge_slug');
     }
 
     /**
@@ -87,15 +119,15 @@ class MKWABadgesSystem {
      * Check user attendance streak.
      */
     private static function check_streak($user_id, $days) {
-        // Logic to verify attendance streak of $days.
-        return true; // Placeholder for actual streak logic.
+        // Implement attendance streak logic.
+        return true; // Placeholder.
     }
 
     /**
      * Get referral count.
      */
     private static function get_referral_count($user_id) {
-        // Fetch referral count from the database.
+        // Fetch referral count from the database or logic.
         return 5; // Placeholder.
     }
 
@@ -133,4 +165,3 @@ class MKWABadgesSystem {
         echo '</form>';
     }
 }
-?>

@@ -19,7 +19,7 @@ class MKWAPointsSystem {
         $charset_collate = $wpdb->get_charset_collate();
 
         $sql = "CREATE TABLE " . self::$table_name . " (
-            id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            id BIGINT(20) UNSIGNED AUTO_INCREMENT,
             user_id BIGINT(20) UNSIGNED NOT NULL,
             points INT NOT NULL,
             description TEXT NOT NULL,
