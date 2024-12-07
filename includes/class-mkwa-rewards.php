@@ -4,43 +4,48 @@ if (!defined('ABSPATH')) {
 }
 
 class MKWARewardsStore {
-    private static $table_name; // Table for managing rewards
+    private static $table_name;
+    private static $log_table_name;
 
     public static function init() {
         global $wpdb;
         self::$table_name = $wpdb->prefix . 'mkwa_rewards';
-        
+        self::$log_table_name = $wpdb->prefix . 'mkwa_rewards_log';
+
         // Hook for handling AJAX requests for redemptions
         add_action('wp_ajax_mkwa_redeem_reward', [__CLASS__, 'redeem_reward']);
+        // Add admin menu for reward management
+        add_action('admin_menu', [__CLASS__, 'add_admin_menu']);
     }
 
-    public static function create_table() {
+    public static function create_tables() {
         global $wpdb;
         $charset_collate = $wpdb->get_charset_collate();
-        $sql = "CREATE TABLE " . self::$table_name . " (
+
+        $rewards_table = "CREATE TABLE " . self::$table_name . " (
             id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             reward_name VARCHAR(255) NOT NULL,
+            description TEXT,
             points_required INT NOT NULL,
             stock INT DEFAULT 0,
+            category ENUM('low', 'mid', 'high') NOT NULL,
+            seasonal TINYINT(1) DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         ) $charset_collate;";
-        
+
+        $log_table = "CREATE TABLE " . self::$log_table_name . " (
+            id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id BIGINT(20) UNSIGNED NOT NULL,
+            reward_id BIGINT(20) UNSIGNED NOT NULL,
+            reward_name VARCHAR(255) NOT NULL,
+            points_spent INT NOT NULL,
+            redeemed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (reward_id) REFERENCES " . self::$table_name . "(id) ON DELETE CASCADE
+        ) $charset_collate;";
+
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-        dbDelta($sql);
-    }
-
-    public static function add_reward($reward_name, $points_required, $stock) {
-        global $wpdb;
-        $wpdb->insert(self::$table_name, [
-            'reward_name' => $reward_name,
-            'points_required' => $points_required,
-            'stock' => $stock,
-        ], ['%s', '%d', '%d']);
-    }
-
-    public static function get_rewards() {
-        global $wpdb;
-        return $wpdb->get_results("SELECT * FROM " . self::$table_name . " WHERE stock > 0");
+        dbDelta($rewards_table);
+        dbDelta($log_table);
     }
 
     public static function redeem_reward() {
@@ -69,39 +74,37 @@ class MKWARewardsStore {
         $wpdb->update(self::$table_name, ['stock' => $reward->stock - 1], ['id' => $reward_id], ['%d'], ['%d']);
 
         // Log the redemption
-        self::log_redemption($user_id, $reward->reward_name);
+        $wpdb->insert(self::$log_table_name, [
+            'user_id' => $user_id,
+            'reward_id' => $reward_id,
+            'reward_name' => $reward->reward_name,
+            'points_spent' => $reward->points_required,
+        ], ['%d', '%d', '%s', '%d']);
 
         wp_send_json_success('Reward redeemed successfully!');
     }
 
-    public static function log_redemption($user_id, $reward_name) {
-        // Log the redemption (could be stored in a database or sent as a notification)
-        $message = sprintf('User %d redeemed reward: %s', $user_id, $reward_name);
-        error_log($message); // For development/debugging purposes
-    }
+    public static function display_redemption_history($user_id) {
+        global $wpdb;
+        $history = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM " . self::$log_table_name . " WHERE user_id = %d ORDER BY redeemed_at DESC",
+            $user_id
+        ));
 
-    public static function display_rewards_store($atts) {
-        $user_id = get_current_user_id();
-        $points = MKWAPointsSystem::get_user_points($user_id);
-        $rewards = self::get_rewards();
+        if (empty($history)) {
+            echo '<p>No rewards redeemed yet.</p>';
+            return;
+        }
 
-        ob_start();
-        echo '<div class="mkwa-rewards-store">';
-        echo '<h2>Rewards Store</h2>';
-        echo '<p>You have ' . esc_html($points) . ' points to spend.</p>';
+        echo '<h3>Your Redemption History</h3>';
         echo '<ul>';
-        foreach ($rewards as $reward) {
+        foreach ($history as $entry) {
             echo '<li>';
-            echo esc_html($reward->reward_name) . ' - ' . esc_html($reward->points_required) . ' points';
-            if ($reward->stock > 0) {
-                echo ' <button class="redeem-reward" data-reward-id="' . esc_attr($reward->id) . '">Redeem</button>';
-            } else {
-                echo ' <span class="out-of-stock">Out of Stock</span>';
-            }
+            echo esc_html($entry->reward_name) . ' - ';
+            echo esc_html($entry->points_spent) . ' points ';
+            echo '<small>(Redeemed on: ' . esc_html($entry->redeemed_at) . ')</small>';
             echo '</li>';
         }
         echo '</ul>';
-        echo '</div>';
-        return ob_get_clean();
     }
 }

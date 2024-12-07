@@ -4,64 +4,153 @@ if (!defined('ABSPATH')) {
 }
 
 class MKWAPointsSystem {
+    private static $table_name;
+
     public static function init() {
-        // Create the points table upon plugin activation
-        register_activation_hook(__FILE__, [__CLASS__, 'create_table']);
+        global $wpdb;
+        self::$table_name = $wpdb->prefix . 'mkwa_points';
+
+        // Add scheduled action for resetting streaks
+        add_action('mkwa_reset_streaks_daily', [__CLASS__, 'reset_daily_streaks']);
     }
 
     public static function create_table() {
         global $wpdb;
-        $table_name = $wpdb->prefix . 'mkwa_points';
         $charset_collate = $wpdb->get_charset_collate();
 
-        $sql = "CREATE TABLE $table_name (
-            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+        $sql = "CREATE TABLE " . self::$table_name . " (
+            id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             user_id BIGINT(20) UNSIGNED NOT NULL,
             points INT NOT NULL,
             description TEXT NOT NULL,
             date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            streak_days INT DEFAULT 0,
+            last_activity_date DATE,
             PRIMARY KEY (id),
-            KEY user_id (user_id)
+            UNIQUE KEY user_last_activity (user_id, last_activity_date)
         ) $charset_collate;";
 
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql);
     }
 
+    /**
+     * Add points for a user with an optional description.
+     */
     public static function add_points($user_id, $points, $description = '') {
         global $wpdb;
-        $table_name = $wpdb->prefix . 'mkwa_points';
 
-        $wpdb->insert($table_name, [
+        $wpdb->insert(self::$table_name, [
             'user_id' => $user_id,
             'points' => $points,
             'description' => $description,
-        ]);
+        ], ['%d', '%d', '%s']);
 
-        // Update user meta with total points
+        // Update total points in user meta
         $total_points = self::get_user_points($user_id);
         update_user_meta($user_id, 'mkwa_total_points', $total_points);
     }
 
+    /**
+     * Deduct points for a user.
+     */
+    public static function deduct_user_points($user_id, $points) {
+        global $wpdb;
+        $wpdb->insert(self::$table_name, [
+            'user_id' => $user_id,
+            'points' => -abs($points),
+            'description' => 'Points deduction',
+        ], ['%d', '%d', '%s']);
+
+        $total_points = self::get_user_points($user_id);
+        update_user_meta($user_id, 'mkwa_total_points', $total_points);
+    }
+
+    /**
+     * Get total points for a user.
+     */
     public static function get_user_points($user_id) {
         global $wpdb;
-        $table_name = $wpdb->prefix . 'mkwa_points';
-
         $points = $wpdb->get_var($wpdb->prepare(
-            "SELECT SUM(points) FROM $table_name WHERE user_id = %d",
+            "SELECT SUM(points) FROM " . self::$table_name . " WHERE user_id = %d",
             $user_id
         ));
 
         return $points ? $points : 0;
     }
 
+    /**
+     * Get a user's points log.
+     */
     public static function get_user_points_log($user_id) {
         global $wpdb;
-        $table_name = $wpdb->prefix . 'mkwa_points';
-
         return $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM $table_name WHERE user_id = %d ORDER BY date DESC",
+            "SELECT * FROM " . self::$table_name . " WHERE user_id = %d ORDER BY date DESC",
             $user_id
         ));
+    }
+
+    /**
+     * Track daily streaks.
+     */
+    public static function update_daily_streak($user_id) {
+        global $wpdb;
+        $last_activity = $wpdb->get_var($wpdb->prepare(
+            "SELECT last_activity_date FROM " . self::$table_name . " WHERE user_id = %d ORDER BY last_activity_date DESC LIMIT 1",
+            $user_id
+        ));
+
+        $today = current_time('Y-m-d');
+        if ($last_activity === $today) {
+            return; // Already updated today
+        }
+
+        $streak_days = 1;
+        if ($last_activity && date('Y-m-d', strtotime($last_activity . ' +1 day')) === $today) {
+            // Continue streak
+            $streak_days = $wpdb->get_var($wpdb->prepare(
+                "SELECT streak_days FROM " . self::$table_name . " WHERE user_id = %d ORDER BY last_activity_date DESC LIMIT 1",
+                $user_id
+            )) + 1;
+        }
+
+        $wpdb->insert(self::$table_name, [
+            'user_id' => $user_id,
+            'points' => 5, // Reward for maintaining streak
+            'description' => 'Daily streak bonus',
+            'streak_days' => $streak_days,
+            'last_activity_date' => $today,
+        ], ['%d', '%d', '%s', '%d', '%s']);
+
+        // Update user meta for streak
+        update_user_meta($user_id, 'mkwa_streak_days', $streak_days);
+    }
+
+    /**
+     * Reset daily streaks for inactive users.
+     */
+    public static function reset_daily_streaks() {
+        global $wpdb;
+        $yesterday = date('Y-m-d', strtotime('-1 day'));
+
+        $wpdb->query($wpdb->prepare(
+            "UPDATE " . self::$table_name . " SET streak_days = 0 WHERE last_activity_date < %s",
+            $yesterday
+        ));
+    }
+
+    /**
+     * Award bonus points for group class attendance.
+     */
+    public static function award_group_class_bonus($user_id, $class_id) {
+        self::add_points($user_id, 10, 'Group class bonus for class ID: ' . $class_id);
+    }
+
+    /**
+     * Award points for referrals.
+     */
+    public static function award_referral_bonus($referrer_id, $referred_id) {
+        self::add_points($referrer_id, 50, 'Referral bonus for referring user ID: ' . $referred_id);
+        self::add_points($referred_id, 25, 'Welcome bonus for joining via referral');
     }
 }

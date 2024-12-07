@@ -25,6 +25,27 @@ function mkwa_add_profile_fields($user) {
                 <p class="description">Check this box if you do not want to be featured in social media shoutouts.</p>
             </td>
         </tr>
+        <tr>
+            <th><label for="mkwa_awarded_badges">Awarded Badges</label></th>
+            <td>
+                <textarea name="mkwa_awarded_badges" id="mkwa_awarded_badges" rows="3" cols="30" readonly><?php echo esc_attr(implode(', ', mkwa_get_badges($user->ID))); ?></textarea>
+                <p class="description">These are the badges you’ve earned so far!</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="mkwa_points">Total Points</label></th>
+            <td>
+                <input type="text" name="mkwa_points" id="mkwa_points" value="<?php echo esc_attr(mkwa_get_points($user->ID)); ?>" readonly />
+                <p class="description">This is your current points total.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="mkwa_current_level">Current Level</label></th>
+            <td>
+                <input type="text" name="mkwa_current_level" id="mkwa_current_level" value="<?php echo esc_attr(mkwa_get_user_level($user->ID)['title']); ?>" readonly />
+                <p class="description">Your current MKWA Fitness level.</p>
+            </td>
+        </tr>
     </table>
     <?php
 }
@@ -61,4 +82,14 @@ function mkwa_member_dashboard_shortcode() {
     return ob_get_clean();
 }
 add_shortcode('mkwa_dashboard', 'mkwa_member_dashboard_shortcode');
+
+// Function to fetch user points
+function mkwa_get_points($user_id) {
+    return MKWAPointsSystem::get_user_points($user_id);
+}
+
+// Function to fetch user badges
+function mkwa_get_badges($user_id) {
+    return MKWABadgesSystem::get_user_badges($user_id);
+}
 ?>

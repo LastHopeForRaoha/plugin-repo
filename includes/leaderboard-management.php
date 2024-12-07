@@ -4,14 +4,16 @@ function mkwa_manage_leaderboards() {
     $table_name = $wpdb->prefix . 'mkwa_leaderboard';
 
     // Handle leaderboard reset
-    if ($_POST['action'] == 'reset_leaderboard') {
+    if (isset($_POST['action']) && $_POST['action'] === 'reset_leaderboard') {
         $wpdb->query("TRUNCATE TABLE $table_name");
         echo '<div class="notice notice-success"><p>Leaderboard reset successfully!</p></div>';
     }
 
     // Fetch leaderboard data
     $leaderboard = $wpdb->get_results(
-        "SELECT user_id, points FROM $table_name ORDER BY points DESC LIMIT 50"
+        "SELECT user_id, points, badges 
+         FROM $table_name 
+         ORDER BY points DESC LIMIT 50"
     );
 
     echo '<div class="wrap"><h1>Manage Leaderboards</h1>';
@@ -21,13 +23,20 @@ function mkwa_manage_leaderboards() {
     if ($leaderboard) {
         echo '<h2>Top Performers</h2>';
         echo '<table class="wp-list-table widefat fixed striped">';
-        echo '<thead><tr><th>Rank</th><th>Member</th><th>Points</th></tr></thead>';
+        echo '<thead><tr><th>Rank</th><th>Member</th><th>Points</th><th>Badges</th></tr></thead>';
         echo '<tbody>';
         $rank = 1;
         foreach ($leaderboard as $entry) {
             $user_info = get_userdata($entry->user_id);
             $display_name = $user_info ? $user_info->display_name : 'Deleted User';
-            echo "<tr><td>{$rank}</td><td>{$display_name}</td><td>{$entry->points}</td></tr>";
+            $badges = !empty($entry->badges) ? implode(', ', unserialize($entry->badges)) : 'No Badges';
+
+            echo "<tr>
+                <td>{$rank}</td>
+                <td>{$display_name}</td>
+                <td>{$entry->points}</td>
+                <td>{$badges}</td>
+            </tr>";
             $rank++;
         }
         echo '</tbody></table>';
@@ -43,4 +52,3 @@ function mkwa_manage_leaderboards() {
     echo '</form>';
     echo '</div>';
 }
-?>
