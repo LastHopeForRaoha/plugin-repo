@@ -12,16 +12,14 @@ class MKWARewardsStore {
         self::$rewards_table = $wpdb->prefix . 'mkwa_rewards';
         self::$rewards_log_table = $wpdb->prefix . 'mkwa_rewards_log';
 
-        // Hook to create tables
-        add_action('plugins_loaded', [__CLASS__, 'create_tables']);
-        // AJAX handler for redeeming rewards
+        // Hook AJAX handler for redeeming rewards
         add_action('wp_ajax_mkwa_redeem_reward', [__CLASS__, 'redeem_reward']);
     }
 
     /**
      * Create the rewards and rewards log tables.
      */
-    public static function create_tables() {
+    public static function create_table() {
         global $wpdb;
         $charset_collate = $wpdb->get_charset_collate();
 

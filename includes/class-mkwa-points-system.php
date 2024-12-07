@@ -30,15 +30,25 @@ class MKWAPointsSystem {
             date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             streak_days INT DEFAULT 0,
             last_activity_date DATE,
-            UNIQUE KEY user_last_activity (user_id, last_activity_date)
+            UNIQUE KEY user_last_activity (user_id, last_activity_date),
+            KEY user_id (user_id)
         ) $charset_collate;";
 
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql);
 
-        // Optional: Log or handle dbDelta errors
         if ($wpdb->last_error) {
             error_log('MKWAPointsSystem: Failed to create table. Error: ' . $wpdb->last_error);
+        }
+    }
+
+    /**
+     * Ensure the table exists before performing any operations.
+     */
+    private static function ensure_table_exists() {
+        global $wpdb;
+        if (!$wpdb->get_var("SHOW TABLES LIKE '" . self::$table_name . "'")) {
+            self::create_table();
         }
     }
 
@@ -47,6 +57,7 @@ class MKWAPointsSystem {
      */
     public static function add_points($user_id, $points, $description = '') {
         global $wpdb;
+        self::ensure_table_exists();
 
         $result = $wpdb->insert(
             self::$table_name,
@@ -79,6 +90,8 @@ class MKWAPointsSystem {
      */
     public static function get_user_points($user_id) {
         global $wpdb;
+        self::ensure_table_exists();
+
         $points = $wpdb->get_var($wpdb->prepare(
             "SELECT SUM(points) FROM " . self::$table_name . " WHERE user_id = %d",
             $user_id
@@ -92,6 +105,8 @@ class MKWAPointsSystem {
      */
     public static function get_user_points_log($user_id) {
         global $wpdb;
+        self::ensure_table_exists();
+
         return $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM " . self::$table_name . " WHERE user_id = %d ORDER BY date DESC",
             $user_id
@@ -103,6 +118,8 @@ class MKWAPointsSystem {
      */
     public static function update_daily_streak($user_id) {
         global $wpdb;
+        self::ensure_table_exists();
+
         $last_activity = $wpdb->get_var($wpdb->prepare(
             "SELECT last_activity_date FROM " . self::$table_name . " WHERE user_id = %d ORDER BY last_activity_date DESC LIMIT 1",
             $user_id
@@ -137,6 +154,8 @@ class MKWAPointsSystem {
      */
     public static function reset_daily_streaks() {
         global $wpdb;
+        self::ensure_table_exists();
+
         $yesterday = date('Y-m-d', strtotime('-1 day'));
 
         $wpdb->query($wpdb->prepare(
@@ -164,3 +183,5 @@ class MKWAPointsSystem {
         self::add_points($referred_id, 25, 'Welcome bonus for joining via referral');
     }
 }
+
+MKWAPointsSystem::init();

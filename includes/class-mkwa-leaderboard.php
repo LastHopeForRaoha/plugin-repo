@@ -31,7 +31,7 @@ class MKWALeaderboard {
             id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             user_id BIGINT(20) UNSIGNED NOT NULL,
             points INT NOT NULL DEFAULT 0,
-            rank INT NOT NULL DEFAULT 0,
+            `rank` INT NOT NULL DEFAULT 0, -- Escaped `rank` as it is a reserved keyword
             category ENUM('overall', 'monthly', 'weekly') DEFAULT 'overall',
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY user_category (user_id, category),
@@ -40,6 +40,10 @@ class MKWALeaderboard {
 
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql);
+
+        if ($wpdb->last_error) {
+            error_log('MKWALeaderboard: Error creating table - ' . $wpdb->last_error);
+        }
     }
 
     /**
@@ -67,7 +71,8 @@ class MKWALeaderboard {
                     $user_info = get_userdata($user->user_id);
 
                     if (!$user_info) {
-                        continue; // Skip users who no longer exist
+                        error_log('MKWALeaderboard: Invalid user ID ' . $user->user_id);
+                        continue; // Skip invalid users
                     }
 
                     $display_name = esc_html($user_info->display_name ?: 'Anonymous');
@@ -95,7 +100,13 @@ class MKWALeaderboard {
                   ORDER BY points DESC
                   LIMIT %d";
 
-        return $wpdb->get_results($wpdb->prepare($query, $category, $limit));
+        $results = $wpdb->get_results($wpdb->prepare($query, $category, $limit));
+
+        if ($wpdb->last_error) {
+            error_log('MKWALeaderboard: Error fetching leaderboard data - ' . $wpdb->last_error);
+        }
+
+        return $results;
     }
 
     /**
@@ -118,6 +129,10 @@ class MKWALeaderboard {
                     ],
                     ['%d', '%d', '%s']
                 );
+
+                if ($wpdb->last_error) {
+                    error_log('MKWALeaderboard: Error updating leaderboard for user ' . $user_id . ' - ' . $wpdb->last_error);
+                }
             }
         }
     }
@@ -132,6 +147,10 @@ class MKWALeaderboard {
             "DELETE FROM " . self::$table_name . " WHERE category = %s",
             'monthly'
         ));
+
+        if ($wpdb->last_error) {
+            error_log('MKWALeaderboard: Error resetting monthly leaderboard - ' . $wpdb->last_error);
+        }
     }
 
     /**
@@ -145,6 +164,11 @@ class MKWALeaderboard {
         global $wpdb;
 
         $wpdb->query("TRUNCATE TABLE " . self::$table_name);
+
+        if ($wpdb->last_error) {
+            error_log('MKWALeaderboard: Error resetting leaderboard - ' . $wpdb->last_error);
+        }
+
         wp_redirect(admin_url('admin.php?page=mkwa-leaderboard'));
         exit;
     }
@@ -163,6 +187,11 @@ class MKWALeaderboard {
             $category
         ));
 
+        if ($wpdb->last_error) {
+            error_log('MKWALeaderboard: Error calculating ranks - ' . $wpdb->last_error);
+            return;
+        }
+
         $rank = 1;
         foreach ($results as $row) {
             $wpdb->update(
@@ -172,6 +201,11 @@ class MKWALeaderboard {
                 ['%d'],
                 ['%d', '%s']
             );
+
+            if ($wpdb->last_error) {
+                error_log('MKWALeaderboard: Error updating rank for user ' . $row->user_id . ' - ' . $wpdb->last_error);
+            }
+
             $rank++;
         }
     }

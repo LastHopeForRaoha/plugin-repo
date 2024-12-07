@@ -2,13 +2,18 @@
 /**
  * Plugin Name: MKWA Fitness Plugin
  * Description: Gamification features for MKWA Fitness, including points, badges, daily quests, workout buddy finder, leaderboard, dashboard, rewards store, and user registration/profile management.
- * Version: 2.1
+ * Version: 2.1.5
  * Author: MKWA Fitness
  */
 
 if (!defined('ABSPATH')) {
     exit;
 }
+
+// Load Text Domain (Translations) at the correct time
+add_action('init', function () {
+    load_plugin_textdomain('mkwafitness', false, dirname(plugin_basename(__FILE__)) . '/languages');
+});
 
 // Include necessary files for all features
 $includes = [
@@ -20,6 +25,7 @@ $includes = [
     'class-mkwa-dashboard.php',
     'class-mkwa-rewards-store.php',
     'class-mkwa-registration.php',
+    'helpers.php', // Common utility functions like mkwa_get_profile_data
 ];
 
 foreach ($includes as $file) {
@@ -33,25 +39,48 @@ foreach ($includes as $file) {
 
 // Initialize all classes
 add_action('plugins_loaded', function () {
-    if (class_exists('MKWAPointsSystem')) MKWAPointsSystem::init();
-    if (class_exists('MKWABadgesSystem')) MKWABadgesSystem::init();
-    if (class_exists('MKWADailyQuests')) MKWADailyQuests::init();
-    if (class_exists('MKWABuddyFinder')) MKWABuddyFinder::init();
-    if (class_exists('MKWALeaderboard')) MKWALeaderboard::init();
-    if (class_exists('MKWADashboard')) MKWADashboard::init();
-    if (class_exists('MKWARewardsStore')) MKWARewardsStore::init();
-    if (class_exists('MKWARegistration')) MKWARegistration::init();
+    $classes = [
+        'MKWAPointsSystem',
+        'MKWABadgesSystem',
+        'MKWADailyQuests',
+        'MKWABuddyFinder',
+        'MKWALeaderboard',
+        'MKWADashboard',
+        'MKWARewardsStore',
+        'MKWARegistration',
+    ];
+
+    foreach ($classes as $class) {
+        if (class_exists($class)) {
+            if (method_exists($class, 'init')) {
+                call_user_func([$class, 'init']);
+            } else {
+                error_log("MKWA Fitness Plugin: Missing init method in class - $class");
+            }
+        } else {
+            error_log("MKWA Fitness Plugin: Missing class - $class");
+        }
+    }
 });
 
 // Activation hook to create database tables
 register_activation_hook(__FILE__, function () {
-    if (class_exists('MKWAPointsSystem')) MKWAPointsSystem::create_table();
-    if (class_exists('MKWABadgesSystem')) MKWABadgesSystem::create_table();
-    if (class_exists('MKWADailyQuests')) MKWADailyQuests::create_table();
-    if (class_exists('MKWABuddyFinder')) MKWABuddyFinder::create_table();
-    if (class_exists('MKWALeaderboard')) MKWALeaderboard::create_table();
-    if (class_exists('MKWARewardsStore')) MKWARewardsStore::create_tables(); // Ensures rewards and log tables are created
-    // MKWARegistration does not require table creation
+    $classes = [
+        'MKWAPointsSystem',
+        'MKWABadgesSystem',
+        'MKWADailyQuests',
+        'MKWABuddyFinder',
+        'MKWALeaderboard',
+        'MKWARewardsStore',
+    ];
+
+    foreach ($classes as $class) {
+        if (class_exists($class) && method_exists($class, 'create_table')) {
+            call_user_func([$class, 'create_table']);
+        } else {
+            error_log("MKWA Fitness Plugin: Missing create_table method in class - $class");
+        }
+    }
 });
 
 // Enqueue scripts and styles
@@ -64,18 +93,24 @@ add_action('wp_enqueue_scripts', function () {
 });
 
 // Shortcodes for displaying features
-$shortcodes = [
-    'mkwa_daily_quests' => 'MKWADailyQuests::display_daily_quests',
-    'mkwa_buddy_finder' => 'MKWABuddyFinder::display_buddy_finder',
-    'mkwa_leaderboard' => 'MKWALeaderboard::display_leaderboard',
-    'mkwa_dashboard' => 'MKWADashboard::display_dashboard',
-    'mkwa_rewards_store' => 'MKWARewardsStore::display_rewards_store',
-    'mkwa_registration_form' => 'MKWARegistration::display_registration_form',
-];
+add_action('init', function () {
+    $shortcodes = [
+        'mkwa_daily_quests' => 'MKWADailyQuests::display_daily_quests',
+        'mkwa_buddy_finder' => 'MKWABuddyFinder::display_buddy_finder',
+        'mkwa_leaderboard' => 'MKWALeaderboard::display_leaderboard',
+        'mkwa_dashboard' => 'MKWADashboard::display_dashboard',
+        'mkwa_rewards_store' => 'MKWARewardsStore::display_rewards_store',
+        'mkwa_registration_form' => 'MKWARegistration::display_registration_form',
+    ];
 
-foreach ($shortcodes as $tag => $callback) {
-    add_shortcode($tag, $callback);
-}
+    foreach ($shortcodes as $tag => $callback) {
+        if (is_callable($callback)) {
+            add_shortcode($tag, $callback);
+        } else {
+            error_log("MKWA Fitness Plugin: Invalid shortcode callback for [$tag]. Ensure the method exists and is public.");
+        }
+    }
+});
 
 // Admin Menu for Settings
 add_action('admin_menu', function () {
@@ -99,3 +134,15 @@ add_action('admin_menu', function () {
         [MKWABadgesSystem::class, 'render_admin_page']
     );
 });
+
+// Fallback for undefined functions
+if (!function_exists('mkwa_get_profile_data')) {
+    function mkwa_get_profile_data($user_id) {
+        $user = get_userdata($user_id);
+        return [
+            'display_name' => $user->display_name ?? '',
+            'bio' => get_user_meta($user_id, 'mkwa_bio', true),
+            'points' => get_user_meta($user_id, 'mkwa_total_points', true),
+        ];
+    }
+}

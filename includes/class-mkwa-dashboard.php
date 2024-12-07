@@ -20,8 +20,15 @@ class MKWADashboard {
         }
 
         $user_id = get_current_user_id();
-        $profile = mkwa_get_profile_data($user_id);
-        $level = mkwa_get_user_level($user_id);
+
+        // Fetch user profile data
+        $profile = [
+            'display_name' => get_user_meta($user_id, 'display_name', true) ?: wp_get_current_user()->display_name,
+            'bio' => get_user_meta($user_id, 'mkwa_bio', true),
+            'points' => MKWAPointsSystem::get_user_points($user_id),
+        ];
+
+        $level = self::get_user_level($profile['points']);
         $badges = MKWABadgesSystem::get_user_badges($user_id);
         $quests = MKWADailyQuests::get_user_quests($user_id);
         $history = MKWAActivityHistory::get_user_history($user_id);
@@ -33,22 +40,24 @@ class MKWADashboard {
             <img src="<?php echo esc_url(get_user_meta($user_id, 'profile_picture', true) ?: plugin_dir_url(__FILE__) . 'assets/default-avatar.png'); ?>" alt="Profile Picture" class="profile-picture">
             <p><strong>Bio:</strong> <?php echo esc_html($profile['bio'] ?: 'No bio provided.'); ?></p>
 
+            <!-- Progress Section -->
             <div class="progress-section">
                 <h3>Your Progress</h3>
-                <p><strong>Total Points:</strong> <?php echo esc_html($profile['points'] ?: 0); ?></p>
-                <p><strong>Current Level:</strong> <?php echo esc_html($level['title'] ?: 'N/A'); ?></p>
-                <p><strong>Next Level:</strong> <?php echo esc_html($level['next_title'] ?: 'N/A'); ?> (<?php echo esc_html($level['points_to_next'] ?: 0); ?> points to go)</p>
+                <p><strong>Total Points:</strong> <?php echo esc_html($profile['points']); ?></p>
+                <p><strong>Current Level:</strong> <?php echo esc_html($level['title']); ?></p>
+                <p><strong>Next Level:</strong> <?php echo esc_html($level['next_title']); ?> (<?php echo esc_html($level['points_to_next']); ?> points to go)</p>
                 <div class="progress-bar">
-                    <div class="progress-fill" style="width: <?php echo esc_attr($level['progress_percent'] ?: 0); ?>%;"></div>
+                    <div class="progress-fill" style="width: <?php echo esc_attr($level['progress_percent']); ?>%;"></div>
                 </div>
             </div>
 
+            <!-- Badges Section -->
             <div class="badges-section">
                 <h3>Your Badges</h3>
                 <?php if (!empty($badges)) : ?>
                     <ul>
                         <?php foreach ($badges as $badge) : ?>
-                            <li><?php echo esc_html($badge['name'] ?: 'Unnamed Badge'); ?> - <?php echo esc_html($badge['description'] ?: 'No description.'); ?></li>
+                            <li><?php echo esc_html($badge['name']); ?> - <?php echo esc_html($badge['description']); ?></li>
                         <?php endforeach; ?>
                     </ul>
                 <?php else : ?>
@@ -56,12 +65,13 @@ class MKWADashboard {
                 <?php endif; ?>
             </div>
 
+            <!-- Quests Section -->
             <div class="quests-section">
                 <h3>Daily Quests</h3>
                 <?php if (!empty($quests)) : ?>
                     <ul>
                         <?php foreach ($quests as $quest) : ?>
-                            <li><?php echo esc_html($quest->quest_name ?: 'Unknown Quest'); ?> - <?php echo $quest->completed ? 'Completed' : 'Incomplete'; ?></li>
+                            <li><?php echo esc_html($quest->quest_name); ?> - <?php echo $quest->completed ? 'Completed' : 'Incomplete'; ?></li>
                         <?php endforeach; ?>
                     </ul>
                 <?php else : ?>
@@ -69,12 +79,13 @@ class MKWADashboard {
                 <?php endif; ?>
             </div>
 
+            <!-- Activity History Section -->
             <div class="history-section">
                 <h3>Activity History</h3>
                 <ul>
                     <?php if (!empty($history)) : ?>
                         <?php foreach ($history as $event) : ?>
-                            <li><?php echo esc_html($event['date'] ?: 'N/A'); ?> - <?php echo esc_html($event['description'] ?: 'No description.'); ?></li>
+                            <li><?php echo esc_html($event['date']); ?> - <?php echo esc_html($event['description']); ?></li>
                         <?php endforeach; ?>
                     <?php else : ?>
                         <p>No activity history yet.</p>
@@ -82,18 +93,14 @@ class MKWADashboard {
                 </ul>
             </div>
 
-            <div class="overall-score-section">
-                <h3>Overall Member Score</h3>
-                <p>Your Overall Score: <?php echo esc_html(self::calculate_overall_score($user_id) ?: 0); ?></p>
-            </div>
-
+            <!-- Profile Edit Section -->
             <div class="profile-edit-section">
                 <h3>Edit Profile</h3>
                 <form id="mkwa-profile-form" method="POST" enctype="multipart/form-data">
                     <label for="profile-picture">Upload Profile Picture:</label>
                     <input type="file" id="profile-picture" name="profile_picture">
                     <label for="mkwa-bio">Update Bio:</label>
-                    <textarea id="mkwa-bio" name="mkwa_bio"><?php echo esc_attr($profile['bio']); ?></textarea>
+                    <textarea id="mkwa-bio" name="mkwa_bio"><?php echo esc_textarea($profile['bio']); ?></textarea>
                     <?php wp_nonce_field('mkwa_update_profile_nonce', 'mkwa_profile_nonce'); ?>
                     <button type="submit">Update Profile</button>
                 </form>
@@ -129,24 +136,36 @@ class MKWADashboard {
     }
 
     /**
-     * Calculate overall member score.
+     * Fetch user level details.
      */
-    public static function calculate_overall_score($user_id) {
-        $weights = [
-            'attendance' => 0.3,
-            'challenge_completion' => 0.2,
-            'community_participation' => 0.15,
-            'streak_maintenance' => 0.2,
-            'point_earning_rate' => 0.15,
+    private static function get_user_level($points) {
+        $levels = [
+            ['title' => 'Beginner', 'points' => 0],
+            ['title' => 'Intermediate', 'points' => 500],
+            ['title' => 'Advanced', 'points' => 1000],
         ];
-        $metrics = MKWAActivityHistory::gather_user_metrics($user_id);
-        $overall_score = 0;
 
-        foreach ($weights as $category => $weight) {
-            $overall_score += ($metrics[$category] ?? 0) * $weight;
+        $current = $levels[0];
+        $next = $levels[1];
+        $progress = 0;
+
+        foreach ($levels as $index => $level) {
+            if ($points >= $level['points']) {
+                $current = $level;
+                $next = $levels[$index + 1] ?? null;
+            }
         }
 
-        return round($overall_score, 2);
+        if ($next) {
+            $progress = (($points - $current['points']) / ($next['points'] - $current['points'])) * 100;
+        }
+
+        return [
+            'title' => $current['title'],
+            'next_title' => $next['title'] ?? 'Max Level',
+            'points_to_next' => $next['points'] - $points ?? 0,
+            'progress_percent' => $progress,
+        ];
     }
 }
 
