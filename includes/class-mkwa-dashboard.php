@@ -14,12 +14,44 @@ class MKWADashboard {
     /**
      * Display the user dashboard.
      */
-    public static function display_dashboard($atts) {
-        if (!is_user_logged_in()) {
-            return '<p>Please log in to view your dashboard.</p>';
-        }
+public static function display_dashboard() {
+    ob_start();
+    ?>
+    <div class="mkwa-dashboard">
+        <h2>Welcome Back, <?php echo wp_get_current_user()->display_name; ?>!</h2>
+        <p>Your Current Points: <?php echo get_user_meta(get_current_user_id(), 'mkwa_points', true); ?></p>
+        
+        <!-- Daily Quests Section -->
+        <h3>Today's Quests</h3>
+        <div><?php echo do_shortcode('[mkwa_daily_quests]'); ?></div>
 
-        $user_id = get_current_user_id();
+        <!-- Rewards Progress -->
+        <h3>Your Rewards Progress</h3>
+        <p>Redeemable Points: <?php echo get_user_meta(get_current_user_id(), 'mkwa_points', true); ?></p>
+        <a href="/rewards-store" class="btn btn-primary">Visit Rewards Store</a>
+
+        <!-- Leaderboard Section -->
+        <h3>Leaderboard Snapshot</h3>
+        <div><?php echo do_shortcode('[mkwa_leaderboard_snapshot]'); ?></div>
+
+        <!-- Activity Log -->
+        <h3>Your Recent Activity</h3>
+        <ul>
+            <?php
+            global $wpdb;
+            $activities = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM {$wpdb->prefix}mkwa_activity_log WHERE user_id = %d ORDER BY timestamp DESC LIMIT 5",
+                get_current_user_id()
+            ));
+            foreach ($activities as $activity) {
+                echo "<li>{$activity->activity_type} on " . date('F j, Y', strtotime($activity->timestamp)) . "</li>";
+            }
+            ?>
+        </ul>
+    </div>
+    <?php
+    return ob_get_clean();
+}
 
         // Fetch user profile data
         $profile = [
@@ -121,6 +153,23 @@ class MKWADashboard {
         <?php
         return ob_get_clean();
     }
+    
+public function render_dashboard() {
+    ob_start();
+    ?>
+    <div class="mkwa-dashboard">
+        <h2>Welcome to Your Dashboard</h2>
+        <p>Total Points: <?php echo get_user_meta(get_current_user_id(), 'mkwa_points', true); ?></p>
+        <div>
+            <?php echo do_shortcode('[mkwa_daily_quests]'); ?>
+        </div>
+        <div>
+            <?php echo do_shortcode('[mkwa_leaderboard_snapshot]'); ?>
+        </div>
+    </div>
+    <?php
+    return ob_get_clean();
+}
 
     /**
      * Handle AJAX profile update.

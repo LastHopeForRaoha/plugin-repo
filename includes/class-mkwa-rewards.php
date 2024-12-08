@@ -47,6 +47,37 @@ class MKWARewardsStore {
         dbDelta($rewards_table);
         dbDelta($log_table);
     }
+public static function display_rewards_store() {
+    global $wpdb;
+
+    $rewards = $wpdb->get_results("SELECT * FROM {$wpdb->prefix}mkwa_rewards WHERE stock > 0");
+
+    ob_start();
+    ?>
+    <div class="mkwa-rewards-store">
+        <h2>Redeem Your Rewards</h2>
+        <div class="rewards-grid">
+            <?php foreach ($rewards as $reward): ?>
+                <div class="reward-item">
+                    <h3><?php echo esc_html($reward->name); ?></h3>
+                    <p>Cost: <?php echo intval($reward->points_required); ?> Points</p>
+                    <p>Description: <?php echo esc_html($reward->description); ?></p>
+                    <button class="redeem-btn" data-reward-id="<?php echo $reward->id; ?>">Redeem</button>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    <script>
+    document.querySelectorAll('.redeem-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const rewardId = this.dataset.rewardId;
+            // AJAX request to handle redemption
+        });
+    });
+    </script>
+    <?php
+    return ob_get_clean();
+}
 
     public static function redeem_reward() {
         if (!is_user_logged_in()) {

@@ -137,6 +137,19 @@ class MKWALeaderboard {
         }
     }
 
+public function render_leaderboard() {
+    global $wpdb;
+    $leaderboard_data = $wpdb->get_results("SELECT user_id, points FROM {$wpdb->prefix}mkwa_points ORDER BY points DESC LIMIT 10");
+
+    ob_start();
+    echo '<h2>Leaderboard</h2><ul>';
+    foreach ($leaderboard_data as $entry) {
+        echo '<li>' . get_user_meta($entry->user_id, 'nickname', true) . ': ' . $entry->points . '</li>';
+    }
+    echo '</ul>';
+    return ob_get_clean();
+}
+
     /**
      * Reset monthly leaderboard.
      */
